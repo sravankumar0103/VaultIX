@@ -37,8 +37,8 @@ export default function LandingPage() {
           loop
           muted
           playsInline
-          onLoadedData={() => setIsVideoLoaded(true)}
-          className={`w-full h-full object-cover transition-opacity duration-1000 ${
+          onCanPlay={() => setIsVideoLoaded(true)}
+          className={`w-full h-full object-cover transition-opacity duration-700 ${
             isVideoLoaded ? "opacity-100" : "opacity-0"
           }`}
         >
@@ -88,9 +88,9 @@ export default function LandingPage() {
               loop
               muted
               playsInline
-              onLoadedData={() => setIsVideoLoaded(true)}
-              style={{ objectPosition: '10% center' }}
-              className={`w-full h-full object-cover transition-opacity duration-1000 ${
+              onCanPlay={() => setIsVideoLoaded(true)}
+              style={{ objectPosition: '0% center' }}
+              className={`w-full h-full object-cover scale-[3] transition-opacity duration-700 ${
                 isVideoLoaded ? "opacity-100" : "opacity-0"
               }`}
             >

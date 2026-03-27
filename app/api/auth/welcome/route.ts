@@ -10,14 +10,14 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Admin client to update user metadata
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
-
 export async function POST(req: NextRequest) {
+  // Admin client to update user metadata (initialized inside to be build-safe)
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+    process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
   try {
     const authHeader = req.headers.get("Authorization")
     if (!authHeader?.startsWith("Bearer ")) {
