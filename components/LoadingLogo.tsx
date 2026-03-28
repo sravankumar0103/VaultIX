@@ -3,13 +3,24 @@
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 
-export default function LoadingLogo({ delayMs = 300 }: { delayMs?: number }) {
+export default function LoadingLogo({ loading = true, delayMs = 300, inline = false }: { loading?: boolean, delayMs?: number, inline?: boolean }) {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
-    const timer = setTimeout(() => setShow(true), delayMs)
-    return () => clearTimeout(timer)
-  }, [delayMs])
+    let timer: number | undefined
+
+    if (loading) {
+      timer = window.setTimeout(() => {
+        setShow(true)
+      }, delayMs)
+    } else {
+      setShow(false)
+    }
+
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [loading, delayMs])
 
   if (!show) return null
 
@@ -36,8 +47,7 @@ export default function LoadingLogo({ delayMs = 300 }: { delayMs?: number }) {
     },
   }
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center w-full h-screen bg-themeBg/40 backdrop-blur-[2px] animate-in fade-in duration-300">
+  const logoContent = (
       <motion.div
         variants={containerVariants}
         initial="initial"
@@ -48,12 +58,21 @@ export default function LoadingLogo({ delayMs = 300 }: { delayMs?: number }) {
           <motion.span
             key={index}
             variants={letterVariants}
-            className={index >= 5 ? "text-purple-500" : "text-themeText"}
+            className={index >= 5 ? "text-purple-500" : "text-current"}
           >
             {letter}
           </motion.span>
         ))}
       </motion.div>
+  )
+
+  if (inline) {
+    return logoContent;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center w-full h-screen bg-themeBg/40 backdrop-blur-[2px] animate-in fade-in duration-300">
+      {logoContent}
     </div>
   )
 }

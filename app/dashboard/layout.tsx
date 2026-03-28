@@ -3,6 +3,7 @@
 import Sidebar from "@/components/Sidebar"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
+import type { Session } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import MobileHeader from "@/components/MobileHeader"
 import MobileSidebar from "@/components/MobileSidebar"
@@ -10,15 +11,7 @@ import MobileSidebar from "@/components/MobileSidebar"
 function WelcomeCheck() {
   const router = useRouter()
   useEffect(() => {
-    const checkWelcome = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-
-      if (!session) {
-        router.push("/")
-        return
-      }
-
-      // Use a user-specific session storage flag to avoid multiple calls in the same session
+    const runWelcome = async (session: Session) => {
       const welcomeChecked = sessionStorage.getItem(`vaultix_welcome_checked_${session.user.id}`)
       if (welcomeChecked) return
 
@@ -26,8 +19,8 @@ function WelcomeCheck() {
         await fetch("/api/auth/welcome", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${session.access_token}`
-          }
+            Authorization: `Bearer ${session.access_token}`,
+          },
         })
         sessionStorage.setItem(`vaultix_welcome_checked_${session.user.id}`, "true")
       } catch (err) {
@@ -35,8 +28,21 @@ function WelcomeCheck() {
       }
     }
 
-    checkWelcome()
-  }, [])
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event !== "INITIAL_SESSION") return
+
+      if (!session) {
+        router.replace("/")
+        return
+      }
+
+      await runWelcome(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [router])
 
   return null
 }

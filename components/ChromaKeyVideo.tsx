@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import LoadingLogo from "@/components/LoadingLogo";
 
 interface ChromaKeyVideoProps {
   src: string;
@@ -150,9 +151,8 @@ export const ChromaKeyVideo: React.FC<ChromaKeyVideoProps> = ({
         }}
       />
       {!isPlaying && !error && (
-        <div className="absolute inset-0 flex items-center justify-center flex-col gap-4">
-          <div className="w-10 h-10 border-4 border-purple-500/10 border-t-purple-500 rounded-full animate-spin" />
-          <span className="text-[10px] font-black text-purple-500/50 uppercase tracking-[0.2em]">Initialising IX Engine...</span>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <LoadingLogo delayMs={0} inline />
         </div>
       )}
       {error && (
