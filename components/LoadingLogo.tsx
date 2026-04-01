@@ -17,6 +17,7 @@ export default function LoadingLogo({ loading = true, delayMs = 300, inline = fa
       setShow(false)
     }
 
+    
     return () => {
       if (timer !== undefined) window.clearTimeout(timer)
     }

@@ -2,8 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { signOutGracefully } from "@/lib/authSession"
+import { clearSessionThemeOverride } from "@/lib/themePreferences"
+import LoadingLogo from "@/components/LoadingLogo"
 import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
 import {
   LayoutDashboard,
   Star,
@@ -25,6 +27,7 @@ export default function Sidebar({
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>
 }) {
   const pathname = usePathname()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const navItems = [
     { name: "All Bookmarks", href: "/dashboard", icon: LayoutDashboard },
@@ -35,13 +38,19 @@ export default function Sidebar({
   ]
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    if (isLoggingOut) return
+
+    setIsLoggingOut(true)
+    await signOutGracefully()
+    clearSessionThemeOverride()
     window.location.href = "/"
   }
 
   return (
-    <aside
-      className={`
+    <>
+      <LoadingLogo loading={isLoggingOut} delayMs={0} />
+      <aside
+        className={`
         ${collapsed ? "w-[88px]" : "w-64"}
         h-[calc(100vh-2rem)] my-4 ml-4
         bg-themeSidebar
@@ -153,6 +162,7 @@ export default function Sidebar({
         </button>
 
       </div>
-    </aside>
+      </aside>
+    </>
   )
 }

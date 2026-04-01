@@ -8,6 +8,7 @@ import BookmarkCard from "@/components/BookmarkCard"
 import type { Bookmark } from "@/types/bookmark"
 import type { User } from "@supabase/supabase-js"
 import Toast from "@/components/Toast"
+import { useRouter } from "next/navigation"
 import {
   Clock,
   ArrowUp,
@@ -30,6 +31,7 @@ import {
 import { useTheme } from "@/app/ThemeContext"
 import { motion, AnimatePresence } from "framer-motion"
 import LoadingLogo from "@/components/LoadingLogo"
+import { isDeletedAccountError, recoverFromAuthError } from "@/lib/authSession"
 
 export default function BookmarkContainer({
   mode = "all",
@@ -91,6 +93,7 @@ export default function BookmarkContainer({
 
   const viewRef = useRef<HTMLDivElement | null>(null)
   const sortRef = useRef<HTMLDivElement | null>(null)
+  const router = useRouter()
 
   const { theme, toggleTheme, setTheme } = useTheme()
 
@@ -100,7 +103,16 @@ export default function BookmarkContainer({
   useEffect(() => {
     const getUserAndPrefs = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (error) {
+          const recovered = await recoverFromAuthError(error.message)
+          if (recovered && isDeletedAccountError(error.message)) {
+            router.replace("/")
+            return
+          }
+          return
+        }
+
         if (user) {
           setUser(user)
 
@@ -110,7 +122,7 @@ export default function BookmarkContainer({
             localStorage.setItem("vaultix-default-theme", meta.theme_preference)
             // ONLY apply the default theme if the user hasn't toggled it this session
             const sessionTheme = sessionStorage.getItem("vaultix-session-theme")
-            if (!sessionTheme && meta.theme_preference !== theme) {
+            if (!sessionTheme) {
               setTheme(meta.theme_preference)
             }
           }
@@ -126,7 +138,7 @@ export default function BookmarkContainer({
       }
     }
     getUserAndPrefs()
-  }, [])
+  }, [router, setTheme])
 
   /* =========================
      Fetch + Realtime

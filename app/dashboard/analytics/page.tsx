@@ -3,8 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { motion } from "framer-motion"
-import jsPDF from "jspdf"
-import { toPng } from "html-to-image"
+import { useRouter } from "next/navigation"
 import {
   TrendingUp,
   PieChart as PieIcon,
@@ -20,10 +19,12 @@ import {
   DistributionChart
 } from "@/components/AnalyticsChart"
 import LoadingLogo from "@/components/LoadingLogo"
+import { isDeletedAccountError, recoverFromAuthError } from "@/lib/authSession"
 
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const dashboardRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
   const [data, setData] = useState<any>({
     growth: [],
     distribution: [],
@@ -43,6 +44,11 @@ export default function AnalyticsPage() {
     if (!dashboardRef.current) return
 
     try {
+      const [{ default: jsPDF }, { toPng }] = await Promise.all([
+        import("jspdf"),
+        import("html-to-image"),
+      ])
+
       const dataUrl = await toPng(dashboardRef.current, {
         backgroundColor: document.documentElement.classList.contains("dark") ? "#020617" : "#f8fafc",
         quality: 1.0,
@@ -63,8 +69,20 @@ export default function AnalyticsPage() {
 
   const fetchAnalyticsData = async (silent = false) => {
     if (!silent) setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError) {
+      const recovered = await recoverFromAuthError(userError.message)
+      if (recovered && isDeletedAccountError(userError.message)) {
+        router.replace("/")
+      }
+      if (!silent) setLoading(false)
+      return
+    }
+
+    if (!user) {
+      if (!silent) setLoading(false)
+      return
+    }
 
     const { data: bookmarks, error } = await supabase
       .from("bookmarks")
@@ -176,7 +194,7 @@ export default function AnalyticsPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [router])
 
   if (loading) {
     return (

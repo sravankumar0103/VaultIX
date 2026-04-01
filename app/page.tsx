@@ -6,14 +6,27 @@ import { Session } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import LoadingLogo from "@/components/LoadingLogo";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  clearLocalAuthSession,
+  clearReturningUser,
+  consumeDeletedAccountNotice,
+  isDeletedAccountError,
+  isReturningUser,
+  markReturningUser,
+  recoverFromAuthError,
+  startGoogleSignIn,
+  validateStoredReturningUser,
+} from "@/lib/authSession";
+import { clearSessionThemeOverride } from "@/lib/themePreferences";
 
 export default function LandingPage() {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [isVideoLoaded, setIsVideoLoaded] = useState(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const [isAuthStarting, setIsAuthStarting] = useState(false);
+  const [showDeletedAccountNotice, setShowDeletedAccountNotice] = useState(false);
   const [videoKey] = useState(() => `${Date.now()}-${Math.random()}`);
   const desktopVideoRef = useRef<HTMLVideoElement | null>(null);
   const mobileVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -33,16 +46,59 @@ export default function LandingPage() {
       });
     };
 
+    const showPendingDeletedNotice = () => {
+      if (!consumeDeletedAccountNotice()) {
+        return;
+      }
+
+      setShowDeletedAccountNotice(true);
+      window.setTimeout(() => {
+        setShowDeletedAccountNotice(false);
+      }, 4200);
+    };
+
+    showPendingDeletedNotice();
     window.addEventListener("click", handleInteraction, { once: true });
 
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      if (error) {
+        const recovered = await recoverFromAuthError(error.message);
+        if (recovered && isDeletedAccountError(error.message)) {
+          showPendingDeletedNotice();
+        }
+        if (!recovered) {
+          console.error("Failed to get landing session:", error);
+        }
+        setSession(null);
+        return;
+      }
+
       setSession(data.session);
+      if (data.session) {
+        const { data: userData, error: userError } = await supabase.auth.getUser()
+        if (userError || !userData.user) {
+          const recovered = await recoverFromAuthError(userError?.message)
+          if (recovered && isDeletedAccountError(userError?.message)) {
+            showPendingDeletedNotice()
+          }
+          if (!recovered) {
+            await clearLocalAuthSession()
+          }
+          clearReturningUser()
+          setSession(null)
+          return
+        }
+
+        markReturningUser(userData.user.id);
+        router.replace("/dashboard");
+      }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event, nextSession) => {
         setSession(nextSession);
-        if (event === "INITIAL_SESSION" && nextSession) {
+        if (nextSession) {
+          markReturningUser(nextSession.user.id);
           router.replace("/dashboard");
         }
       }
@@ -55,8 +111,31 @@ export default function LandingPage() {
     };
   }, [router]);
 
+  const handleOpenVault = async () => {
+    if (session) {
+      router.push("/dashboard");
+      return;
+    }
+
+    if (isReturningUser()) {
+      const isValidReturningUser = await validateStoredReturningUser()
+      if (!isValidReturningUser) {
+        router.push("/auth")
+        return
+      }
+
+      setIsAuthStarting(true);
+      clearSessionThemeOverride();
+      await startGoogleSignIn(`${window.location.origin}/dashboard`);
+      return;
+    }
+
+    router.push("/auth");
+  };
+
   return (
     <main className="relative min-h-screen bg-[#030303] text-white overflow-x-hidden font-sans selection:bg-purple-500/30 flex flex-col items-center">
+      <LoadingLogo loading={isAuthStarting} delayMs={0} />
 
       {/* Cinematic Background Video (ex2) - Case 1 (Desktop) */}
       <div className="absolute inset-0 z-0 h-screen w-full hidden md:flex items-center justify-center overflow-hidden">
@@ -117,13 +196,13 @@ export default function LandingPage() {
           animate={{ opacity: isVideoLoaded ? 1 : 0, scale: isVideoLoaded ? 1 : 0.95 }}
           transition={{ duration: 1.2, delay: 1, ease: [0.16, 1, 0.3, 1] }}
         >
-          <Link
-            href={session ? "/dashboard" : "/auth"}
+          <button
+            onClick={handleOpenVault}
             className="px-14 py-5 bg-white/5 backdrop-blur-3xl border border-white/10 text-white rounded-full font-bold text-lg hover:bg-white hover:text-black transition-all duration-500 flex items-center gap-4 shadow-[0_0_50px_rgba(255,255,255,0.05)]"
           >
             <span>Open Your Vault</span>
             <ArrowRight className="w-5 h-5" />
-          </Link>
+          </button>
         </motion.div>
       </div>
 
@@ -190,13 +269,13 @@ export default function LandingPage() {
           transition={{ duration: 1, delay: 1 }}
           className="mt-12 mb-20"
         >
-          <Link
-            href={session ? "/dashboard" : "/auth"}
+          <button
+            onClick={handleOpenVault}
             className="group flex items-center gap-4 px-10 py-5 bg-white text-black rounded-2xl font-black text-lg shadow-2xl active:scale-95 transition-all"
           >
             <span>Open Your Vault</span>
             <ArrowRight className="w-5 h-5" />
-          </Link>
+          </button>
         </motion.div>
 
       </div>
@@ -207,6 +286,19 @@ export default function LandingPage() {
           Tap anywhere to unmute the sound
         </div>
       )}
+
+      <AnimatePresence>
+        {showDeletedAccountNotice ? (
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="fixed left-1/2 top-6 z-[120] w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-white/10 bg-black/80 px-4 py-3 text-center text-sm font-medium text-white shadow-2xl backdrop-blur-xl"
+          >
+            Your account was deleted. Please create it again.
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       {/* Loading Overlay */}
       <AnimatePresence>

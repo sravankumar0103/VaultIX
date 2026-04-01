@@ -1,17 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./ThemeContext";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Vaultix",
@@ -31,20 +22,30 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  const theme = localStorage.getItem('vaultix-theme') || localStorage.getItem('vaultix-default-theme');
-                  const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  if (theme === 'dark' || (!theme && supportDarkMode)) {
-                    document.documentElement.classList.add('dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
+                  const sessionTheme = sessionStorage.getItem('vaultix-session-theme');
+                  const storedDefaultTheme = localStorage.getItem('vaultix-default-theme');
+                  const legacyTheme = localStorage.getItem('vaultix-theme');
+                  const defaultTheme = storedDefaultTheme === 'light' || storedDefaultTheme === 'dark'
+                    ? storedDefaultTheme
+                    : legacyTheme === 'light' || legacyTheme === 'dark'
+                      ? legacyTheme
+                      : 'dark';
+                  const theme = sessionTheme === 'light' || sessionTheme === 'dark' ? sessionTheme : defaultTheme;
+
+                  if (legacyTheme === 'light' || legacyTheme === 'dark') {
+                    localStorage.setItem('vaultix-default-theme', legacyTheme);
+                    localStorage.removeItem('vaultix-theme');
                   }
+
+                  document.documentElement.dataset.theme = theme;
+                  document.documentElement.classList.toggle('dark', theme === 'dark');
                 } catch (e) {}
               })();
             `,
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className="antialiased">
         <ThemeProvider>
           {children}
         </ThemeProvider>

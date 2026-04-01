@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
 import nodemailer from "nodemailer"
+import { releaseRequestLock, tryAcquireRequestLock } from "@/lib/requestLocks"
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -37,15 +38,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: "Welcome email already sent" })
     }
 
-    const userName = user.user_metadata?.full_name || user.user_metadata?.name || "there"
-    const userEmail = user.email!
+    const welcomeLockKey = `welcome:${user.id}`
+    if (!tryAcquireRequestLock(welcomeLockKey, 60_000)) {
+      return NextResponse.json({ success: true, message: "Welcome email already in progress" })
+    }
 
-    // Send Welcome Email
-    const mailOptions = {
-      from: `"VaultIX" <${process.env.GMAIL_USER}>`,
-      to: userEmail,
-      subject: `Welcome to VaultIX, ${userName}!`,
-      html: `
+    try {
+      const userName = user.user_metadata?.full_name || user.user_metadata?.name || "there"
+      const userEmail = user.email!
+
+      // Send Welcome Email
+      const mailOptions = {
+        from: `"VaultIX" <${process.env.GMAIL_USER}>`,
+        to: userEmail,
+        subject: `Welcome to VaultIX, ${userName}!`,
+        html: `
         <!DOCTYPE html>
         <html>
           <head>
@@ -113,21 +120,24 @@ export async function POST(req: NextRequest) {
           </body>
         </html>
       `,
-    };
+      };
 
-    await transporter.sendMail(mailOptions);
+      await transporter.sendMail(mailOptions);
 
-    // Mark as sent in user metadata
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-      user_metadata: { ...user.user_metadata, welcome_sent: true }
-    })
+      // Mark as sent in user metadata
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        user_metadata: { ...user.user_metadata, welcome_sent: true }
+      })
 
-    if (updateError) {
-      console.error("Failed to update user metadata:", updateError)
+      if (updateError) {
+        console.error("Failed to update user metadata:", updateError)
+      }
+
+      return NextResponse.json({ success: true, message: "Welcome email sent" })
+    } finally {
+      releaseRequestLock(welcomeLockKey)
     }
-
-    return NextResponse.json({ success: true, message: "Welcome email sent" })
-  } catch (err: any) {
+  } catch (err) {
     console.error("Welcome API error:", err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

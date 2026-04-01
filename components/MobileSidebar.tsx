@@ -2,7 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { supabase } from "@/lib/supabaseClient"
+import { signOutGracefully } from "@/lib/authSession"
+import { clearSessionThemeOverride } from "@/lib/themePreferences"
 import {
   LayoutDashboard,
   Star,
@@ -14,6 +15,8 @@ import {
   X,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useState } from "react"
+import LoadingLogo from "@/components/LoadingLogo"
 
 export default function MobileSidebar({
   isOpen,
@@ -23,6 +26,7 @@ export default function MobileSidebar({
   onClose: () => void
 }) {
   const pathname = usePathname()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const navItems = [
     { name: "All Bookmarks", href: "/dashboard", icon: LayoutDashboard },
@@ -33,14 +37,20 @@ export default function MobileSidebar({
   ]
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    if (isLoggingOut) return
+
+    setIsLoggingOut(true)
+    await signOutGracefully()
+    clearSessionThemeOverride()
     window.location.href = "/"
   }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
+    <>
+      <LoadingLogo loading={isLoggingOut} delayMs={0} />
+      <AnimatePresence>
+        {isOpen && (
+          <>
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -118,8 +128,9 @@ export default function MobileSidebar({
               </button>
             </div>
           </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   )
 }

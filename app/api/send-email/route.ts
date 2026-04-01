@@ -41,8 +41,9 @@ export async function POST(req: NextRequest) {
                 
                 <!-- Branding Header -->
                 <div style="padding: 32px 32px 24px 32px; text-align: left;">
-                  <span class="logo-vault" style="font-size: 24px; font-weight: 800; letter-spacing: -0.025em; color: #0f172a;">Vault<span style="color: #8b5cf6;">IX</span></span>
+                  <span class="logo-vault" style="font-size: 24px; font-weight: 800; letter-spacing: -0.025em; color: #0f172a;">Vault<span style="color: #9C27B0;">IX</span></span>
                 </div>
+
 
                 <div style="padding: 0 32px 32px 32px;">
                   <!-- User Info Section (Minimalist) -->

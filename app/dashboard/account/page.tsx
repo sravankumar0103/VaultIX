@@ -6,6 +6,8 @@ import { useTheme } from "@/app/ThemeContext"
 import type { User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
+import { DEFAULT_THEME, getStoredDefaultTheme, isTheme, type Theme } from "@/lib/themePreferences"
+import { clearLocalAuthSession, clearReturningUser, recoverFromAuthError } from "@/lib/authSession"
 import {
     User as UserIcon,
     Mail,
@@ -25,7 +27,7 @@ import LoadingLogo from "@/components/LoadingLogo"
 
 export default function AccountPage() {
     const router = useRouter()
-    const { theme, toggleTheme, setTheme } = useTheme()
+    const { setDefaultTheme: applyDefaultTheme } = useTheme()
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
 
@@ -37,11 +39,12 @@ export default function AccountPage() {
     const [email, setEmail] = useState("")
 
     // Default theme preference (persisted with label)
-    const [defaultTheme, setDefaultTheme] = useState<"light" | "dark">("dark")
+    const [defaultTheme, setDefaultTheme] = useState<Theme>(DEFAULT_THEME)
 
     // Delete account
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
     const [deleteConfirmText, setDeleteConfirmText] = useState("")
+    const [isDeletingAccount, setIsDeletingAccount] = useState(false)
 
     // Complaint form
     const [complaintSubject, setComplaintSubject] = useState("")
@@ -57,27 +60,36 @@ export default function AccountPage() {
 
     useEffect(() => {
         const getUser = async () => {
-            const { data } = await supabase.auth.getUser()
+            const { data, error } = await supabase.auth.getUser()
+            if (error) {
+                const recovered = await recoverFromAuthError(error.message)
+                if (!recovered) {
+                    console.error("Failed to load user:", error)
+                }
+                router.push("/")
+                setLoading(false)
+                return
+            }
+
             if (data?.user) {
                 setUser(data.user)
                 setDisplayName(data.user.user_metadata?.full_name || data.user.user_metadata?.name || "")
                 setEmail(data.user.email || "")
+                const accountTheme = isTheme(data.user.user_metadata?.theme_preference)
+                    ? data.user.user_metadata.theme_preference
+                    : getStoredDefaultTheme() ?? DEFAULT_THEME
+                setDefaultTheme(accountTheme)
             } else {
                 router.push("/")
             }
             setLoading(false)
         }
         getUser()
-
-        const saved = localStorage.getItem("vaultix-default-theme") as "light" | "dark" | null
-        if (saved) setDefaultTheme(saved)
-        else setDefaultTheme((localStorage.getItem("vaultix-theme") as "light" | "dark") || "dark")
-    }, [])
+    }, [router])
 
     const handleSave = async () => {
         if (!user) return
         try {
-            const updates: Record<string, any> = {}
             if (displayName !== (user.user_metadata?.full_name || user.user_metadata?.name || "")) {
                 await supabase.auth.updateUser({ data: { full_name: displayName, name: displayName } })
             }
@@ -94,14 +106,10 @@ export default function AccountPage() {
         }
     }
 
-    const handleDefaultTheme = async (t: "light" | "dark") => {
+    const handleDefaultTheme = async (t: Theme) => {
+        const previousTheme = defaultTheme
         setDefaultTheme(t)
-        localStorage.setItem("vaultix-default-theme", t)
-
-        // Clear any temporary session overrides so the new default applies immediately
-        sessionStorage.removeItem("vaultix-session-theme")
-        // Force the theme context to apply the new default
-        setTheme(t)
+        applyDefaultTheme(t)
 
         // Persist to Supabase
         const { error } = await supabase.auth.updateUser({
@@ -109,6 +117,8 @@ export default function AccountPage() {
         })
 
         if (error) {
+            setDefaultTheme(previousTheme)
+            applyDefaultTheme(previousTheme)
             showToast("Failed to save preference to cloud", "error")
         } else {
             showToast(`Default theme set to ${t} (Synced to account)`, "success")
@@ -116,7 +126,9 @@ export default function AccountPage() {
     }
 
     const handleDeleteAccount = async () => {
-        if (deleteConfirmText !== "DELETE") return
+        if (deleteConfirmText !== "DELETE" || isDeletingAccount) return
+        setIsDeletingAccount(true)
+
         try {
             // Get the current session JWT to authenticate the server-side call
             const { data: sessionData } = await supabase.auth.getSession()
@@ -134,12 +146,15 @@ export default function AccountPage() {
                 return
             }
 
-            // Fully sign out and redirect
+            // The auth user is already removed server-side, so clear the local session only.
             sessionStorage.clear()
-            await supabase.auth.signOut()
+            clearReturningUser()
+            await clearLocalAuthSession()
             window.location.href = "/?deleted=true"
         } catch {
             showToast("Failed to delete account", "error")
+        } finally {
+            setIsDeletingAccount(false)
         }
     }
 
@@ -413,11 +428,11 @@ export default function AccountPage() {
                                 </button>
                                 <button
                                     onClick={handleDeleteAccount}
-                                    disabled={deleteConfirmText !== "DELETE"}
+                                    disabled={deleteConfirmText !== "DELETE" || isDeletingAccount}
                                     className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-xs transition-all"
                                 >
                                     <Trash2 size={12} />
-                                    Confirm Delete
+                                    {isDeletingAccount ? "Deleting..." : "Confirm Delete"}
                                 </button>
                             </div>
                         </motion.div>

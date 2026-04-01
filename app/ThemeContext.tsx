@@ -1,65 +1,83 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-
-type Theme = "light" | "dark"
+import {
+  applyThemeToDocument,
+  clearSessionThemeOverride,
+  getStoredSessionTheme,
+  persistDefaultTheme,
+  persistSessionTheme,
+  resolveStoredTheme,
+  type Theme,
+} from "@/lib/themePreferences"
 
 type ThemeContextType = {
   theme: Theme
+  isHydrated: boolean
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
+  setDefaultTheme: (theme: Theme) => void
+  syncThemeFromAccount: (theme: Theme) => void
+  resetThemeToDefault: () => void
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("dark")
-  const [mounted, setMounted] = useState(false)
+  const [theme, setThemeState] = useState<Theme>(() => resolveStoredTheme())
+  const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-    // 1. Check if there's a session-specific override first
-    const sessionTheme = sessionStorage.getItem("vaultix-session-theme") as Theme | null
-    if (sessionTheme) {
-      setTheme(sessionTheme)
-      return
-    }
+    const hydrationFrame = window.requestAnimationFrame(() => {
+      setIsHydrated(true)
+    })
 
-    // 2. Otherwise fall back to the account default
-    const defaultTheme = localStorage.getItem("vaultix-default-theme") as Theme | null
-    if (defaultTheme) {
-      setTheme(defaultTheme)
-    } else {
-      // Legacy fallback
-      const oldTheme = localStorage.getItem("vaultix-theme") as Theme | null
-      if (oldTheme) {
-        setTheme(oldTheme)
-      } else {
-         setTheme("dark") // Ensure very first load is dark
-      }
-    }
+    return () => window.cancelAnimationFrame(hydrationFrame)
   }, [])
 
   useEffect(() => {
-    // Only apply the class; don't blindly overwrite the default theme
-    if (theme === "dark") {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
+    if (!isHydrated) {
+      return
     }
-  }, [theme])
+
+    applyThemeToDocument(theme)
+  }, [theme, isHydrated])
+
+  const setTheme = (nextTheme: Theme) => {
+    setThemeState(nextTheme)
+  }
 
   const toggleTheme = () => {
-    setTheme(prev => {
-      const newTheme = prev === "dark" ? "light" : "dark"
-      // Only persist the toggle for this session
-      sessionStorage.setItem("vaultix-session-theme", newTheme)
-      return newTheme
+    setThemeState((previousTheme) => {
+      const nextTheme = previousTheme === "dark" ? "light" : "dark"
+      persistSessionTheme(nextTheme)
+      return nextTheme
     })
   }
 
+  const setDefaultTheme = (nextTheme: Theme) => {
+    persistDefaultTheme(nextTheme)
+    clearSessionThemeOverride()
+    setThemeState(nextTheme)
+  }
+
+  const syncThemeFromAccount = (nextTheme: Theme) => {
+    persistDefaultTheme(nextTheme)
+
+    if (!getStoredSessionTheme()) {
+      setThemeState(nextTheme)
+    }
+  }
+
+  const resetThemeToDefault = () => {
+    clearSessionThemeOverride()
+    setThemeState(resolveStoredTheme())
+  }
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider
+      value={{ theme, isHydrated, setTheme, toggleTheme, setDefaultTheme, syncThemeFromAccount, resetThemeToDefault }}
+    >
       {children}
     </ThemeContext.Provider>
   )
