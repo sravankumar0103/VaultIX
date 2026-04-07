@@ -72,7 +72,7 @@ export default function BookmarkCard({
   )
 
   const CategoryBadge = () => (
-    <span className="px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 text-xs font-semibold tracking-wide border border-purple-500/20">
+    <span className="px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-500 text-xs font-semibold tracking-wide border border-purple-500/20">
       {bookmark.category || (isMedia ? "Media" : "URL")}
     </span>
   )
@@ -141,7 +141,7 @@ export default function BookmarkCard({
                 </span>
               </a>
             ) : (
-              <a 
+              <a
                 href={mediaLink}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -153,7 +153,7 @@ export default function BookmarkCard({
           </div>
         ) : (
           <div className="flex items-start justify-between mb-4">
-            <a 
+            <a
               href={cardLink as string}
               target="_blank"
               rel="noopener noreferrer"
@@ -174,7 +174,7 @@ export default function BookmarkCard({
             </div>
           )}
 
-          <a 
+          <a
             href={cardLink as string}
             target="_blank"
             rel="noopener noreferrer"
@@ -229,7 +229,7 @@ export default function BookmarkCard({
             )}
           </div>
 
-          <a 
+          <a
             href={cardLink as string}
             target="_blank"
             rel="noopener noreferrer"
@@ -271,7 +271,7 @@ export default function BookmarkCard({
       <motion.div
         className="group flex items-center justify-between py-3 px-4 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5 cursor-default"
       >
-        <a 
+        <a
           href={cardLink as string}
           target="_blank"
           rel="noopener noreferrer"
@@ -319,7 +319,7 @@ export default function BookmarkCard({
           )}
         </a>
       ) : (
-        <a href={cardLink as string} target="_blank" rel="noopener noreferrer" className="block w-full p-6 bg-gradient-to-br from-purple-500/10 to-fuchsia-500/10 border-b border-white/5">
+        <a href={cardLink as string} target="_blank" rel="noopener noreferrer" className="block w-full p-6 bg-purple-500/10 border-b border-white/5">
           <h3 className="font-bold text-xl text-themeText mb-2 leading-tight">{bookmark.title}</h3>
           <p className="text-sm text-themeMuted line-clamp-3">{bookmark.description || domainName}</p>
         </a>

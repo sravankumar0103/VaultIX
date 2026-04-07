@@ -220,7 +220,7 @@ export default function AnalyticsPage() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           onClick={exportToPDF}
-          className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold transition-all active:scale-95 shadow-xl shadow-purple-600/30 border border-purple-400/20"
+          className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-2xl bg-purple-500 hover:bg-purple-600 text-white font-bold transition-all active:scale-95 shadow-xl shadow-purple-500/30 border border-purple-500/20"
         >
           <Download size={18} strokeWidth={2.5} />
           <span>Generate Report</span>
@@ -230,7 +230,7 @@ export default function AnalyticsPage() {
       {/* --- STAT CARDS --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { label: "Total Assets", value: data.stats.total, icon: BarChart2, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-500/10" },
+          { label: "Total Assets", value: data.stats.total, icon: BarChart2, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-500/10" },
           { label: "High Priority", value: data.stats.priority, icon: Zap, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-500/10" },
           { label: `Growth (${data.windowLabel})`, value: data.stats.recent, icon: TrendingUp, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-500/10" },
         ].map((stat, i) => (
@@ -264,10 +264,10 @@ export default function AnalyticsPage() {
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400"><TrendingUp size={20} /></div>
+              <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-500"><TrendingUp size={20} /></div>
               <h2 className="text-xl font-bold text-themeText">Growth Velocity</h2>
             </div>
-            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-500/10 px-3 py-1 rounded-full uppercase tracking-widest">
+            <span className="text-[10px] font-bold text-purple-500 bg-purple-50 dark:bg-purple-500/10 px-3 py-1 rounded-full uppercase tracking-widest">
               {data.windowLabel}
             </span>
           </div>

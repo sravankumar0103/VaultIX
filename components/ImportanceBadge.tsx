@@ -8,7 +8,7 @@ export default function ImportanceBadge({ level }: Props) {
     High: "bg-orange-500",
     Medium: "bg-yellow-500 text-black",
     Low: "bg-blue-500",
-    Vaulted: "bg-purple-600",
+    Vaulted: "bg-purple-500",
   }
 
   return (

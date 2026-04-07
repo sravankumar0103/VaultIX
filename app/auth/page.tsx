@@ -180,7 +180,7 @@ export default function AuthPage() {
           >
             <div className="space-y-4">
               <h2 className="text-6xl font-black tracking-[-0.06em] text-slate-900 dark:text-white xl:text-7xl">
-                Vault<span className="bg-gradient-to-r from-purple-500 via-fuchsia-400 to-violet-300 bg-clip-text text-transparent">IX</span>
+                Vault<span className="text-purple-500">IX</span>
               </h2>
               <p className="max-w-2xl text-2xl font-semibold leading-[1.3] text-slate-700 dark:text-slate-100 xl:text-3xl">
                 Secure access to your personal vault.
@@ -206,7 +206,7 @@ export default function AuthPage() {
                   className="mb-2"
                 >
                   <h1 className="text-5xl font-black tracking-tighter text-slate-900 drop-shadow-sm dark:text-white md:text-6xl lg:hidden">
-                    Vault<span className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-transparent">IX</span>
+                    Vault<span className="text-purple-500">IX</span>
                   </h1>
                   <h2 className="hidden text-[2rem] font-black tracking-tight text-slate-900 dark:text-white lg:block">
                     {session && isProfileStep ? "Create your account" : "Access your vault"}
@@ -259,7 +259,7 @@ export default function AuthPage() {
                       whileHover={{ scale: 1.02, y: -2 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={handleCreateAccount}
-                      className="w-full rounded-xl bg-purple-600 py-3 text-sm font-bold text-white shadow-lg shadow-purple-600/20 transition-all hover:bg-purple-700 active:shadow-none"
+                      className="w-full rounded-xl bg-purple-500 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-600 active:shadow-none"
                     >
                       Create account
                     </motion.button>
@@ -269,7 +269,7 @@ export default function AuthPage() {
                     whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={handleLogin}
-                    className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-purple-600 py-3 font-bold text-white transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20"
+                    className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-xl bg-purple-500 py-3 font-bold text-white transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20"
                   >
                     <span className="relative z-10 flex items-center gap-2 text-sm">
                       <svg className="h-4 w-4" viewBox="0 0 24 24">

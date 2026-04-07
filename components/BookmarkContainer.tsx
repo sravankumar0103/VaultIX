@@ -65,7 +65,7 @@ export default function BookmarkContainer({
   const [editTitle, setEditTitle] = useState("")
   const [editUrl, setEditUrl] = useState("")
   const [editDescription, setEditDescription] = useState("")
-  const [editPriority, setEditPriority] = useState<1 | 2 | 3 | "">("")
+  const [editPriority, setEditPriority] = useState<1 | 2 | 3 | "Auto" | "">("")
 
   const [isAddOpen, setIsAddOpen] = useState(false)
 
@@ -314,7 +314,15 @@ export default function BookmarkContainer({
       domain: ix.domain,
       category: mediaFile ? (bookmarkData.url ? "Media+URL" : "Media") : "URL",
       media_url: mediaFile ? URL.createObjectURL(mediaFile) : null,
-      priority: bookmarkData.manualPriority === "Auto" ? 1 : Number(bookmarkData.manualPriority),
+      priority: (() => {
+        if (bookmarkData.manualPriority === "Auto") {
+          const importance = ix.importance as string
+          if (importance === "Critical" || importance === "High") return 3
+          if (importance === "Medium") return 2
+          return 1
+        }
+        return Number(bookmarkData.manualPriority)
+      })(),
       tags: ix.tags,
       is_archived: false,
       created_at: new Date().toISOString(),
@@ -447,13 +455,24 @@ export default function BookmarkContainer({
     const originalBookmark = { ...editingBookmark }
     const ix = runIX(editUrl, editTitle)
     
+    const isMedia = !!mediaFile || !!editingBookmark.media_url
+    const category = isMedia ? (editUrl ? "Media+URL" : "Media") : "URL"
+
     const updatedData = {
       title: editTitle,
       url: editUrl,
       description: editDescription,
       domain: ix.domain,
-      category: ix.category,
-      priority: (editPriority as number) || 1,
+      category: category,
+      priority: (() => {
+        if (editPriority === "Auto" || editPriority === "") {
+          const importance = ix.importance as string
+          if (importance === "Critical" || importance === "High") return 3
+          if (importance === "Medium") return 2
+          return 1
+        }
+        return Number(editPriority)
+      })(),
       tags: ix.tags,
     }
 
@@ -468,12 +487,43 @@ export default function BookmarkContainer({
 
     // 2. Background Persistence
     try {
+      let mediaUrl = editingBookmark.media_url || null
+
+      if (mediaFile) {
+        // Delete old one if exists
+        if (editingBookmark.media_url) {
+           const storagePrefix = "/storage/v1/object/public/media/"
+           const idx = editingBookmark.media_url.indexOf(storagePrefix)
+           if (idx !== -1) {
+             const filePath = editingBookmark.media_url.slice(idx + storagePrefix.length)
+             await supabase.storage.from("media").remove([filePath])
+           }
+        }
+
+        // Upload new one
+        const ext = mediaFile.name.split(".").pop() || "bin"
+        const slug = editTitle.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "").slice(0, 60)
+        const randomId = Math.random().toString(36).substring(2, 6)
+        const fileName = `${slug}-${randomId}.${ext}`
+
+        const { error: uploadError } = await supabase.storage.from("media").upload(fileName, mediaFile)
+        if (uploadError) throw uploadError
+        
+        const { data } = supabase.storage.from("media").getPublicUrl(fileName)
+        mediaUrl = data.publicUrl
+      }
+
       const { error } = await supabase
         .from("bookmarks")
-        .update(updatedData)
+        .update({
+          ...updatedData,
+          media_url: mediaUrl
+        })
         .eq("id", bookmarkId)
 
       if (error) throw error
+      
+      setMediaFile(null) // Clean up
       showToast("Bookmark updated", "success")
     } catch (err) {
       console.error("Update failed:", err)
@@ -775,7 +825,7 @@ export default function BookmarkContainer({
                   setEditTitle(bookmark.title)
                   setEditUrl(bookmark.url || "")
                   setEditDescription(bookmark.description || "")
-                  setEditPriority((bookmark.priority as 1 | 2 | 3) || "")
+                  setEditPriority((bookmark.priority as 1 | 2 | 3) || "Auto")
                 }}
               />
             ))}
@@ -863,19 +913,17 @@ export default function BookmarkContainer({
                   </div>
 
                   <div className="flex flex-col md:flex-row gap-3">
-                    {!editingBookmark && (
-                      <div className="space-y-1 flex-1">
-                        <label className="text-[11px] font-medium text-themeMuted uppercase tracking-wider ml-0.5">
-                          Upload Media (Optional)
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*,video/*,.pdf"
-                          onChange={(e) => setMediaFile(e.target.files ? e.target.files[0] : null)}
-                          className="w-full px-3 py-2.5 rounded-xl bg-themeSurface border border-white/5 text-themeText file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-500 file:text-white hover:file:bg-purple-600 transition-all cursor-pointer text-sm"
-                        />
-                      </div>
-                    )}
+                    <div className="space-y-1 flex-1">
+                      <label className="text-[11px] font-medium text-themeMuted uppercase tracking-wider ml-0.5">
+                        Upload Media (Optional)
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*,video/*,.pdf"
+                        onChange={(e) => setMediaFile(e.target.files ? e.target.files[0] : null)}
+                        className="w-full px-3 py-2.5 rounded-xl bg-themeSurface border border-white/5 text-themeText file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-500 file:text-white hover:file:bg-purple-600 transition-all cursor-pointer text-sm"
+                      />
+                    </div>
 
                     <div className="space-y-1 flex-1">
                       <label className="text-[11px] font-medium text-themeMuted uppercase tracking-wider ml-0.5">

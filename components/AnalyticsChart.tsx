@@ -24,7 +24,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
         return (
             <div className="glass p-3 border-none rounded-2xl shadow-2xl min-w-[120px]">
-                <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 mb-1 uppercase tracking-widest">{name}</p>
+                <p className="text-[10px] font-bold text-purple-500 mb-1 uppercase tracking-widest">{name}</p>
                 <div className="flex items-baseline gap-1.5">
                     <span className="text-2xl font-black text-themeText leading-none">{payload[0].value}</span>
                     <span className="text-[10px] font-semibold text-themeMuted uppercase tracking-tight">items</span>
@@ -43,8 +43,8 @@ export const GrowthChart = ({ data }: { data: any[] }) => {
                 <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                         <linearGradient id="gradientArea" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#9333ea" stopOpacity={0.2} />
-                            <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
                         </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.15)" />
@@ -62,12 +62,12 @@ export const GrowthChart = ({ data }: { data: any[] }) => {
                     />
                     <Tooltip
                         content={<CustomTooltip />}
-                        cursor={{ stroke: '#9333ea', strokeWidth: 1, strokeDasharray: '4 4' }}
+                        cursor={{ stroke: '#a855f7', strokeWidth: 1, strokeDasharray: '4 4' }}
                     />
                     <Area
                         type="monotone"
                         dataKey="count"
-                        stroke="#9333ea"
+                        stroke="#a855f7"
                         strokeWidth={3}
                         fillOpacity={1}
                         fill="url(#gradientArea)"
@@ -82,7 +82,7 @@ export const GrowthChart = ({ data }: { data: any[] }) => {
 
 // --- 2. DISTRIBUTION PIE CHART ---
 export const DistributionChart = ({ data }: { data: any[] }) => {
-    const COLORS = ["#9333ea", "#d946ef", "#6366f1", "#06b6d4"]
+    const COLORS = ["#a855f7", "#d946ef", "#6366f1", "#06b6d4"]
 
     return (
         <div className="w-full h-40 relative">
