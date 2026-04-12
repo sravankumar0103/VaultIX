@@ -602,10 +602,10 @@ export default function BookmarkContainer({
       <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between pt-4">
         <div className="max-w-[calc(100vw-48px)]">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col">
-            <h2 className="text-lg md:text-xl font-medium text-themeMuted mb-1 truncate">
+            <h2 className="text-sm md:text-lg font-medium text-themeMuted mb-1 truncate">
               Hey, {user?.user_metadata?.full_name || user?.user_metadata?.name || "Sravan Kumar"}.
             </h2>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-themeText mb-2">
+            <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-themeText mb-2">
               {getHeaderTitle()}
             </h1>
           </motion.div>
@@ -625,7 +625,7 @@ export default function BookmarkContainer({
       </div>
 
       {/* ===== CONTROLS ROW ===== */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between p-2 rounded-2xl glass mb-4">
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between p-2 rounded-2xl glass mb-4 relative z-20">
 
         {/* Search */}
         <div className="relative w-full sm:w-96 group">
@@ -645,14 +645,14 @@ export default function BookmarkContainer({
           <div ref={sortRef} className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setIsSortOpen(!isSortOpen); }}
-              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-themeText text-sm flex items-center gap-2 transition-all active:scale-95"
+              className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-themeText text-sm flex items-center gap-2 transition-all active:scale-95"
             >
               <ArrowUpDown size={16} className="text-themeMuted" />
               <span>Sort</span>
             </button>
 
             {isSortOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-themeCard border border-white/10 rounded-xl shadow-2xl p-1.5 z-[100]">
+              <div className="absolute left-0 top-full mt-2 w-48 bg-themeCard border border-white/10 rounded-xl shadow-2xl p-1.5 z-[100]">
                 {[
                   { id: "date-desc", label: "Newest first" },
                   { id: "date-asc", label: "Oldest first" },
@@ -674,14 +674,14 @@ export default function BookmarkContainer({
           <div ref={viewRef} className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setIsViewOpen(!isViewOpen); }}
-              className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-themeText text-sm flex items-center gap-2 transition-all active:scale-95"
+              className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-themeText text-sm flex items-center gap-2 transition-all active:scale-95"
             >
               <Settings2 size={16} className="text-themeMuted" />
               <span>View</span>
             </button>
 
             {isViewOpen && (
-              <div className="absolute left-0 top-full mt-2 w-48 bg-themeCard border border-white/10 rounded-xl shadow-2xl p-1.5 z-[100]">
+              <div className="absolute right-0 sm:left-0 top-full mt-2 w-48 bg-themeCard border border-white/10 rounded-xl shadow-2xl p-1.5 z-[100]">
                 {[
                   { id: "cards", icon: LayoutGrid, label: "Cards" },
                   { id: "list", icon: List, label: "Detailed List" },

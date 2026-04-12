@@ -14,7 +14,7 @@ export default function Footer() {
 
       <div className="relative z-10 max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12 mb-20">
-          
+
           {/* Brand Column */}
           <div className="col-span-2 lg:col-span-2 space-y-6">
             <div className="flex items-center gap-2">

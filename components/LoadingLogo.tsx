@@ -17,7 +17,7 @@ export default function LoadingLogo({ loading = true, delayMs = 300, inline = fa
       setShow(false)
     }
 
-    
+
     return () => {
       if (timer !== undefined) window.clearTimeout(timer)
     }
@@ -49,22 +49,22 @@ export default function LoadingLogo({ loading = true, delayMs = 300, inline = fa
   }
 
   const logoContent = (
-      <motion.div
-        variants={containerVariants}
-        initial="initial"
-        animate="animate"
-        className="flex items-center text-sm md:text-base font-black tracking-tight"
-      >
-        {letters.map((letter, index) => (
-          <motion.span
-            key={index}
-            variants={letterVariants}
-            className={index >= 5 ? "text-purple-500" : "text-current"}
-          >
-            {letter}
-          </motion.span>
-        ))}
-      </motion.div>
+    <motion.div
+      variants={containerVariants}
+      initial="initial"
+      animate="animate"
+      className="flex items-center text-sm md:text-base font-black tracking-tight"
+    >
+      {letters.map((letter, index) => (
+        <motion.span
+          key={index}
+          variants={letterVariants}
+          className={index >= 5 ? "text-purple-500" : "text-current"}
+        >
+          {letter}
+        </motion.span>
+      ))}
+    </motion.div>
   )
 
   if (inline) {

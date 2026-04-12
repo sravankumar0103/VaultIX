@@ -1,6 +1,7 @@
 import type { Bookmark } from "@/types/bookmark"
+import { useEffect, useState } from "react"
 import { ArchiveRestore, Archive, Trash2, Edit2, ExternalLink, Star } from "lucide-react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 type ViewType = "list" | "headlines" | "cards" | "moodboard"
 
@@ -21,6 +22,20 @@ export default function BookmarkCard({
   onUnarchive,
   onEdit,
 }: Props) {
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
+
+  const mobileActionVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0 }
+  }
+
   let favicon = ""
 
   try {
@@ -60,7 +75,12 @@ export default function BookmarkCard({
   const domainName = bookmark.url ? (() => { try { return new URL(cardLink as string).hostname.replace("www.", "") } catch { return "" } })() : ""
 
   const PriorityStars = ({ className = "" }: { className?: string }) => (
-    <div className={`flex gap-0.5 text-yellow-500 ${className}`}>
+    <motion.div
+      initial={isMobile ? { opacity: 0 } : false}
+      whileInView={isMobile ? { opacity: 1 } : {}}
+      viewport={{ amount: 0.1, margin: "-10% 0px -10% 0px" }}
+      className={`flex gap-0.5 text-yellow-500 ${className}`}
+    >
       {Array.from({ length: 3 }).map((_, i) => (
         <Star
           key={i}
@@ -68,17 +88,23 @@ export default function BookmarkCard({
           className={i < (bookmark.priority ?? 0) ? "fill-current" : "text-gray-300 dark:text-white/10"}
         />
       ))}
-    </div>
+    </motion.div>
   )
 
   const CategoryBadge = () => (
-    <span className="px-2.5 py-1 rounded-md bg-purple-500/10 text-purple-500 text-xs font-semibold tracking-wide border border-purple-500/20">
+    <span className="px-2.5 py-1 rounded-md bg-white/5 text-themeMuted text-xs font-semibold tracking-wide border border-white/10 group-hover:bg-purple-500/10 group-hover:text-purple-500 group-hover:border-purple-500/20 transition-all">
       {bookmark.category || (isMedia ? "Media" : "URL")}
     </span>
   )
 
   const ActionButtons = () => (
-    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+    <motion.div
+      initial={isMobile ? { opacity: 0 } : false}
+      whileInView={isMobile ? { opacity: 1 } : {}}
+      viewport={{ amount: 0.1, margin: "-15% 0px -15% 0px" }}
+      transition={{ duration: 0.3 }}
+      className={`flex items-center gap-1 ${isMobile ? '' : 'opacity-0 group-hover:opacity-100 transition-opacity duration-200'}`}
+    >
       <button
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(bookmark); }}
         className="p-2 text-themeMuted hover:text-purple-500 hover:bg-purple-500/10 rounded-lg transition-colors"
@@ -112,7 +138,20 @@ export default function BookmarkCard({
       >
         <Trash2 size={16} />
       </button>
-    </div>
+    </motion.div>
+  )
+
+  const ActionFooter = () => (
+    <motion.div
+      initial={isMobile ? { opacity: 0, y: 10 } : false}
+      whileInView={isMobile ? { opacity: 1, y: 0 } : {}}
+      viewport={{ amount: 0.1, margin: "-15% 0px -15% 0px" }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className={`p-3 bg-themeCard/90 backdrop-blur-md flex items-center justify-between border-t border-white/10 rounded-b-2xl absolute bottom-0 left-0 right-0 z-20 ${isMobile ? '' : 'hidden'}`}
+    >
+      <PriorityStars />
+      <ActionButtons />
+    </motion.div>
   )
 
 
@@ -169,7 +208,7 @@ export default function BookmarkCard({
 
         <div className="flex-1 flex flex-col">
           {bookmark.media_url && (
-            <div className="absolute top-4 right-4 z-10 bg-black/40 backdrop-blur-md rounded-xl p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute top-4 right-4 z-10 bg-black/40 backdrop-blur-md rounded-xl p-1">
               <ActionButtons />
             </div>
           )}
@@ -325,28 +364,21 @@ export default function BookmarkCard({
         </a>
       )}
 
-      <div className="p-4 bg-themeCard/90 backdrop-blur-md absolute bottom-0 left-0 right-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex flex-col gap-3 border-t border-white/10">
-        {bookmark.media_url && (
-          <h4 className="font-medium text-sm text-themeText truncate">{bookmark.title}</h4>
-        )}
-        <div className="flex items-center justify-between">
-          <PriorityStars />
-          <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(bookmark); }}
-              className="p-1.5 text-white/70 hover:text-white bg-black/20 hover:bg-black/40 rounded transition-colors"
-            >
-              <Edit2 size={14} />
-            </button>
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(bookmark.id); }}
-              className="p-1.5 text-white/70 hover:text-red-400 bg-black/20 hover:bg-black/40 rounded transition-colors"
-            >
-              <Trash2 size={14} />
-            </button>
+      {/* Universal Mobile Footer (Moodboard handles title/media specially) */}
+      <ActionFooter />
+
+      {/* Desktop Hover Panel */}
+      {!isMobile && (
+        <div className="p-4 bg-themeCard/90 backdrop-blur-md absolute bottom-0 left-0 right-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex flex-col gap-3 border-t border-white/10">
+          {bookmark.media_url && (
+            <h4 className="font-medium text-sm text-themeText truncate">{bookmark.title}</h4>
+          )}
+          <div className="flex items-center justify-between">
+            <PriorityStars />
+            <ActionButtons />
           </div>
         </div>
-      </div>
+      )}
     </motion.div>
   )
 }
