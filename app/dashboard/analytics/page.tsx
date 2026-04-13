@@ -228,7 +228,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* --- STAT CARDS --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-6">
         {[
           { label: "Total Assets", value: data.stats.total, icon: BarChart2, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-500/10" },
           { label: "High Priority", value: data.stats.priority, icon: Zap, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-500/10" },
@@ -239,14 +239,14 @@ export default function AnalyticsPage() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="glass p-5 rounded-3xl border border-slate-200 dark:border-white/5 flex items-center gap-4 group hover:shadow-xl hover:shadow-purple-500/5 transition-all"
+            className="glass p-2 md:p-5 rounded-2xl md:rounded-3xl border border-slate-200 dark:border-white/5 flex flex-col md:flex-row items-center gap-1.5 md:gap-4 group hover:shadow-xl hover:shadow-purple-500/5 transition-all"
           >
-            <div className={`p-3.5 rounded-2xl ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform duration-300`}>
-              <stat.icon size={22} />
+            <div className={`p-1.5 md:p-3.5 rounded-lg md:rounded-2xl ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform duration-300`}>
+              <stat.icon size={14} className="md:w-[22px] md:h-[22px]" />
             </div>
-            <div>
-              <p className="text-themeMuted text-[10px] font-bold uppercase tracking-widest mb-1">{stat.label}</p>
-              <p className="text-2xl font-black text-themeText leading-none">{stat.value}</p>
+            <div className="text-center md:text-left">
+              <p className="text-themeMuted text-[7px] md:text-[10px] font-bold uppercase tracking-widest mb-0.5 md:mb-1 leading-tight line-clamp-2">{stat.label}</p>
+              <p className="text-base md:text-2xl font-black text-themeText leading-none">{stat.value}</p>
             </div>
           </motion.div>
         ))}

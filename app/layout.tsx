@@ -7,6 +7,13 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Vaultix",
   description: "Private intelligent bookmark vault",
+  icons: {
+    icon: [
+      { url: "/vaultix-icon.png", type: "image/png" },
+      { url: "/vaultix-icon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/vaultix-icon.png",
+  },
 };
 
 export default function RootLayout({

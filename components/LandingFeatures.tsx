@@ -10,6 +10,7 @@ import {
   Zap,
   ShieldCheck,
   ChevronRight,
+  ArrowRight,
   Monitor,
   Cloud,
   FileText,
@@ -40,22 +41,26 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
   const backgroundOpacity = useTransform(scrollYProgress, [0, 0.2, 0.8, 1], [0, 1, 1, 0]);
 
   return (
-    <section ref={containerRef} className="relative w-full bg-[#050507] overflow-hidden selection:bg-purple-500/30 font-sans">
+    <section ref={containerRef} className="relative w-full bg-[#030303] overflow-hidden selection:bg-purple-500/30 font-sans">
       
-      {/* Background Atmosphere */}
+      {/* Seamless top bridge: fades from hero (#030303) into this section — invisible seam */}
+      <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-[#030303] to-transparent pointer-events-none z-10" />
+
+      {/* Background Atmosphere — layered purple & blue orbs */}
       <motion.div style={{ opacity: backgroundOpacity }} className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[10%] left-[10%] w-[600px] h-[600px] bg-purple-600/5 rounded-full blur-[140px]" />
-        <div className="absolute bottom-[20%] right-[10%] w-[500px] h-[500px] bg-blue-500/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[5%] left-[5%] w-[700px] h-[700px] bg-purple-600/8 rounded-full blur-[160px]" />
+        <div className="absolute top-[30%] right-[5%] w-[500px] h-[500px] bg-indigo-500/6 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[10%] left-[20%] w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-[140px]" />
       </motion.div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 pt-40 pb-40">
+      <div className="relative z-10 max-w-6xl mx-auto px-6 pt-20 md:pt-32 pb-12 md:pb-20">
         
         {/* SECTION 0: TERMINOLOGY */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mb-48 w-full"
+          className="mb-24 md:mb-32 w-full"
         >
           <div className="space-y-6">
              <h2 className="text-3xl md:text-5xl font-bold tracking-tighter text-white leading-none flex items-baseline">
@@ -63,9 +68,9 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
                 <span className="text-lg md:text-2xl text-white/20 font-light italic tracking-normal ml-4">/vôlt iks/</span>
              </h2>
              
-             <p className="text-lg md:text-xl lg:text-2xl text-white/40 font-medium leading-relaxed max-w-4xl">
+             <p className="text-lg md:text-xl lg:text-2xl text-white/55 font-medium leading-relaxed max-w-4xl">
                 An intelligent vault designed to centralize your links, documents, and media into one unified digital space. 
-                Powered by <span className="text-white/60 font-semibold tracking-tight"><span className="text-purple-400 font-bold">I</span>ntelligent inde<span className="text-purple-400 font-bold">X</span>ing</span>, 
+                Powered by <span className="text-white/75 font-semibold tracking-tight"><span className="text-purple-400 font-bold">I</span>ntelligent inde<span className="text-purple-400 font-bold">X</span>ing</span>, 
                 it automatically organizes and prioritizes your most important data so you can find anything in seconds—bringing 
                 your digital life under control and helping you stay focused on what actually matters.
              </p>
@@ -73,7 +78,7 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
         </motion.div>
 
         {/* --- NARRATIVE SECTIONS (01-04) --- */}
-        <div className="space-y-32 md:space-y-48">
+        <div className="space-y-24 md:space-y-32">
            <HybridRefinedSection 
              number="01"
              title="Store smarter."
@@ -114,8 +119,8 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
         </div>
 
         {/* --- THE IX INFRASTRUCTURE BLOCK (Value Restoration) --- */}
-        <div className="mt-80 space-y-24">
-          <div className="flex flex-col items-center text-center space-y-6 mb-24">
+        <div className="mt-32 md:mt-48 space-y-16 md:space-y-24">
+          <div className="flex flex-col items-center text-center space-y-6 mb-16 md:mb-20">
               <h3 className="text-4xl md:text-6xl font-bold text-white tracking-tighter">Technical Architecture</h3>
               <p className="text-white/40 text-lg md:text-xl font-medium leading-relaxed max-w-2xl">
                 The high-performance system powering your digital vault.
@@ -192,14 +197,22 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
 
         {/* --- FINAL CTA --- */}
         <motion.div 
-           initial={{ opacity: 0, scale: 0.98 }}
-           whileInView={{ opacity: 1, scale: 1 }}
+           initial={{ opacity: 0, scale: 0.98, y: 20 }}
+           whileInView={{ opacity: 1, scale: 1, y: 0 }}
            viewport={{ once: true }}
-           className="mt-60 w-full flex flex-col items-center text-center space-y-12 py-32 rounded-[4rem] bg-white/[0.01] border border-white/5 relative overflow-hidden group"
+           className="mt-32 md:mt-48 w-full flex flex-col items-center text-center space-y-8 md:space-y-12 py-20 md:py-28 relative group"
         >
-           <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+           {/* Apple-style atmospheric breathing glow */}
+           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <motion.div 
+                 animate={{ opacity: [0.15, 0.3, 0.15], scale: [0.9, 1.1, 0.9] }} 
+                 transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }} 
+                 className="w-[600px] h-[300px] bg-purple-500/20 rounded-full blur-[120px]" 
+              />
+           </div>
+
            <div className="space-y-4 z-10">
-              <span className="text-[10px] font-black tracking-[0.4em] uppercase text-purple-500">The Final Step</span>
+              <span className="text-[10px] font-black tracking-[0.4em] uppercase text-purple-500 drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]">The Final Step</span>
               <h2 className="text-4xl md:text-7xl font-bold tracking-tighter text-white">
                 Enter the vault.
               </h2>
@@ -208,10 +221,16 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
            <motion.button
               onClick={onOpenVault}
               whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.98 }}
-              className="z-10 group flex items-center gap-4 px-10 py-5 rounded-full bg-white text-black font-bold text-lg shadow-2xl transition-all hover:bg-white/90"
+              whileTap={{ scale: 0.97 }}
+              className="z-10 group relative flex items-center gap-3 px-8 py-[13px] rounded-full font-semibold text-[14px] text-white overflow-hidden tracking-wide"
+              style={{
+                background: '#a855f7',
+                boxShadow: '0 0 0 1px rgba(168,85,247,0.35), 0 0 28px rgba(168,85,247,0.4), 0 4px 14px rgba(0,0,0,0.5)',
+              }}
            >
-              Open Your Vault <ChevronRight className="group-hover:translate-x-1 transition-transform" />
+              <div className="absolute inset-0 translate-x-[-110%] bg-gradient-to-r from-transparent via-white/20 to-transparent group-hover:translate-x-[110%] transition-transform duration-700 ease-in-out" />
+              <span className="relative z-10">Open Your Vault</span>
+              <ArrowRight className="relative z-10 w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-300" />
            </motion.button>
         </motion.div>
 
@@ -242,7 +261,7 @@ function HybridRefinedSection({ number, title, desc, icon, badge, visual, revers
              <h3 className="text-3xl md:text-5xl font-bold tracking-tight text-white leading-tight">
                 {title}
              </h3>
-             <p className="text-base md:text-lg text-white/40 leading-relaxed font-medium max-w-sm">
+             <p className="text-base md:text-lg text-white/55 leading-relaxed font-medium max-w-sm">
                 {desc}
              </p>
 
@@ -281,7 +300,7 @@ function BentoCard({ className, icon, title, desc, visual }: any) {
              </div>
              <h4 className="text-lg font-bold text-white tracking-tight">{title}</h4>
           </div>
-          <p className="text-sm text-white/30 font-medium leading-relaxed max-w-[200px]">{desc}</p>
+          <p className="text-sm text-white/45 font-medium leading-relaxed max-w-[200px]">{desc}</p>
        </div>
 
        <div className="absolute inset-0 flex items-center justify-center pointer-events-none translate-y-10 group-hover:translate-y-4 transition-transform duration-1000 opacity-20 group-hover:opacity-100">
@@ -857,3 +876,4 @@ function PrivacyLock() {
     </div>
   );
 }
+

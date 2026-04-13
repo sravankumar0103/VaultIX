@@ -46,7 +46,13 @@ export default function BookmarkCard({
         : `https://${urlStr}`
 
       const hostname = new URL(formattedUrl).hostname
-      favicon = `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`
+      
+      // Use local brand icon for VaultIX domains
+      if (hostname.includes('vaultix') || hostname.includes('localhost')) {
+        favicon = "/vaultix-icon.png"
+      } else {
+        favicon = `https://www.google.com/s2/favicons?domain=${hostname}&sz=128`
+      }
     }
   } catch (error) {
     favicon = ""

@@ -13,12 +13,11 @@ import {
     Pie,
     Cell
 } from "recharts"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 // --- Custom Styled Tooltip ---
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-        // Recharts Pie and Area charts have different payload structures
         const data = payload[0].payload;
         const name = payload[0].name || data.name || label || "Data";
 
@@ -80,12 +79,14 @@ export const GrowthChart = ({ data }: { data: any[] }) => {
     )
 }
 
-// --- 2. DISTRIBUTION PIE CHART ---
+// --- 2. DISTRIBUTION PIE CHART (Apple-Style Dynamic Center) ---
 export const DistributionChart = ({ data }: { data: any[] }) => {
+    const [activeIndex, setActiveIndex] = React.useState(-1)
     const COLORS = ["#a855f7", "#d946ef", "#6366f1", "#06b6d4"]
+    const total = data.reduce((acc, curr) => acc + curr.value, 0)
 
     return (
-        <div className="w-full h-40 relative">
+        <div className="w-full h-40 relative select-none">
             <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                     <Pie
@@ -98,23 +99,63 @@ export const DistributionChart = ({ data }: { data: any[] }) => {
                         dataKey="value"
                         stroke="none"
                         cornerRadius={8}
+                        onMouseEnter={(_, index) => setActiveIndex(index)}
+                        onMouseLeave={() => setActiveIndex(-1)}
+                        animationBegin={0}
+                        animationDuration={1000}
+                        animationEasing="ease-out"
                     >
                         {data.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Cell
+                                key={`cell-${index}`}
+                                fill={COLORS[index % COLORS.length]}
+                                style={{
+                                    filter: activeIndex === index ? `drop-shadow(0 0 10px ${COLORS[index % COLORS.length]}80)` : 'none',
+                                    transition: 'all 0.3s ease',
+                                    cursor: 'pointer'
+                                }}
+                            />
                         ))}
                     </Pie>
-                    <Tooltip
-                        content={<CustomTooltip />}
-                        cursor={{ stroke: '#d946ef', strokeWidth: 1, strokeDasharray: '4 4' }}
-                    />
                 </PieChart>
             </ResponsiveContainer>
-            {/* Central Label for Donut */}
+
+            {/* Apple-Style Dynamic Center */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-themeMuted text-[9px] font-bold uppercase tracking-widest mb-0.5">Total</span>
-                <span className="text-2xl font-black text-themeText leading-none">
-                    {data.reduce((acc, curr) => acc + curr.value, 0)}
-                </span>
+                <AnimatePresence mode="wait">
+                    {activeIndex === -1 ? (
+                        <motion.div
+                            key="total"
+                            initial={{ opacity: 0, scale: 0.9, y: 4 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: -4 }}
+                            transition={{ duration: 0.15 }}
+                            className="flex flex-col items-center"
+                        >
+                            <span className="text-themeMuted text-[8px] font-bold uppercase tracking-[0.2em] mb-0.5">Total</span>
+                            <span className="text-2xl font-black text-themeText leading-none tabular-nums tracking-tighter">{total}</span>
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="detail"
+                            initial={{ opacity: 0, scale: 0.9, y: 4 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: -4 }}
+                            transition={{ duration: 0.15 }}
+                            className="flex flex-col items-center"
+                        >
+                            <span className="text-purple-500 text-[8px] font-black uppercase tracking-[0.15em] mb-0.5 px-2 text-center truncate max-w-[80px]">
+                                {data[activeIndex].name}
+                            </span>
+                            <div className="flex items-baseline gap-1">
+                                <span className="text-2xl font-black text-themeText leading-none tabular-nums tracking-tighter">
+                                    {data[activeIndex].value}
+                                </span>
+                                <span className="text-[8px] font-bold text-themeMuted uppercase opacity-60">Items</span>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     )

@@ -31,6 +31,7 @@ export default function LandingPage() {
   const [isCtaVisible, setIsCtaVisible] = useState(false);
   const [showDeletedAccountNotice, setShowDeletedAccountNotice] = useState(false);
   const [videoKey] = useState(() => `${Date.now()}-${Math.random()}`);
+  const heroRef = useRef<HTMLElement>(null);
   const desktopVideoRef = useRef<HTMLVideoElement | null>(null);
   const mobileVideoRef = useRef<HTMLVideoElement | null>(null);
   const ctaShownRef = useRef(false); // prevents CTA trigger firing multiple times
@@ -141,7 +142,11 @@ export default function LandingPage() {
     };
 
     showPendingDeletedNotice();
-    window.addEventListener("click", handleInteraction, { once: true });
+    const heroEl = heroRef.current;
+    if (heroEl) {
+      heroEl.addEventListener("click", handleInteraction, { once: true });
+      heroEl.addEventListener("touchstart", handleInteraction, { once: true }); // Adding touchstart for immediate mobile response
+    }
 
     supabase.auth.getSession().then(async ({ data, error }) => {
       if (error) {
@@ -190,7 +195,10 @@ export default function LandingPage() {
     return () => {
       clearTimeout(fallbackTimer);
       clearTimeout(ctaFallbackTimer);
-      window.removeEventListener("click", handleInteraction);
+      if (heroEl) {
+        heroEl.removeEventListener("click", handleInteraction);
+        heroEl.removeEventListener("touchstart", handleInteraction);
+      }
       listener.subscription.unsubscribe();
     };
   }, [router]);
@@ -290,7 +298,7 @@ export default function LandingPage() {
       <LoadingLogo loading={!isVideoLoaded || isAuthStarting} delayMs={0} />
 
       {/* HERO SECTION (Cinematic Entry) */}
-      <section className="relative w-full min-h-[100dvh] shrink-0 flex flex-col items-center justify-center">
+      <section ref={heroRef} className="relative w-full min-h-[100dvh] shrink-0 flex flex-col items-center justify-center">
 
         {/* Cinematic Background Video (ex2) - Case 1 (Desktop) */}
         <div className="absolute inset-0 z-0 h-screen w-full hidden md:flex items-center justify-center overflow-hidden">
