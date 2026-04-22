@@ -5,7 +5,7 @@ import { ThemeProvider } from "./ThemeContext";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Vaultix",
+  title: "VaultIX",
   description: "Private intelligent bookmark vault",
   icons: {
     icon: [

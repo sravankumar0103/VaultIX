@@ -866,7 +866,7 @@ export default function BookmarkContainer({
                   </div>
                   <div className="rounded-xl bg-black/20 border border-white/5 px-3 py-2">
                     <p className="font-medium text-white mb-1">Never lose a gem</p>
-                    <p>Vaultix keeps tutorials, docs and ideas ready to revisit.</p>
+                    <p>VaultIX keeps tutorials, docs and ideas ready to revisit.</p>
                   </div>
                 </div>
               </div>

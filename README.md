@@ -1,45 +1,115 @@
-# VaultIX
-
-**Your intelligent, secure vault. Save, organize, and retrieve what matters instantly.**
-
-VaultIX is a smart bookmark and knowledge management platform. It helps you save links, notes, and resources — then find them instantly using AI-powered search and automatic categorization.
-
----
-
-## Features
-
-- **Smart Bookmarking** — Save any link in seconds. VaultIX automatically analyzes and tags your content for you.
-- **AI Categorization** — Bookmarks are intelligently organized into categories (Work, Learning, Entertainment, etc.) without any manual effort.
-- **Instant Search** — Find anything you've saved instantly with a powerful full-text search.
-- **Analytics Dashboard** — Visualize your saving habits with charts showing your most active categories, recent activity, and usage trends.
-- **Priority Management** — Mark bookmarks as High, Medium, or Low priority to stay focused on what matters.
-- **Light & Dark Mode** — A polished, premium UI that adapts to your preferred theme across all devices.
-- **Secure Authentication** — Sign in with Google. All data is protected with industry-standard encryption via Supabase.
-- **Welcome Emails** — First-time users receive a personalized onboarding email.
-- **Responsive Design** — Fully optimized for Desktop, Tablet, and Mobile.
+<div align="center">
+  <img src="public/vaultix-icon.png" width="100" height="100" alt="VaultIX Logo" />
+  <h1>VaultIX</h1>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" />
+  </a>
+  <p><strong>Your intelligent, secure vault. Save, organize, and retrieve what matters instantly.</strong></p>
+</div>
 
 ---
 
-## How It Works
+## Overview
 
-1. **Sign in** with your Google account.
-2. **Save** any URL using the Add Bookmark panel.
-3. VaultIX **automatically categorizes** and tags the link using AI.
-4. **Search or filter** your vault by category, priority, or keyword.
-5. **Analyze** your knowledge habits in the Analytics Dashboard.
+VaultIX is a high-fidelity bookmark and knowledge management platform designed for the modern digital ecosystem. It centralizes your links, documents, and media into a unified, intelligently indexed space. Unlike traditional bookmark managers, VaultIX focuses on **speed, security, and cinematic user experience**.
 
----
+## Key Features
+
+- **Intelligent Indexing** — Automatic metadata extraction and categorization powered by a context-aware architecture.
+- **Smart Search** — Full-text search that understands intent, allowing you to find any resource in milliseconds.
+- **Privacy by Default** — Secure Google Authentication with complete data sovereignty and a permanent deletion policy.
+- **Visual Intelligence** — Deep insights into your collection trends with interactive analytics charts.
+- **Cinematic UI** — A premium, motion-heavy interface built with Framer Motion and an adaptive theme engine.
+- **Lifecycle Automation** — Integrated email systems for onboarding and critical account status updates.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 16, React 19, Tailwind CSS, Framer Motion
-- **Backend**: Supabase (Auth + PostgreSQL Database)
-- **Email**: Nodemailer (Gmail)
-- **Deployment**: Vercel
+- **Framework**: [Next.js 16](https://nextjs.org/) (App Router, React 19)
+- **Styling**: [Tailwind CSS 4](https://tailwindcss.com/) + [Framer Motion](https://www.framer.com/motion/)
+- **Database & Auth**: [Supabase](https://supabase.com/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Charts**: [Recharts](https://recharts.org/)
+- **Email**: [Nodemailer](https://nodemailer.com/) + Gmail SMTP
+- **Exports**: [jsPDF](https://github.com/parallax/jsPDF) & [html2canvas](https://html2canvas.hertzen.com/)
 
 ---
 
-## Status
+## Project Architecture
 
-> **Beta** — Currently deployed and being tested across multiple devices.  
-> Live at: [vault-ix-ten.vercel.app](https://vault-ix-ten.vercel.app)
+```text
+VaultIX/
+├── app/                  # Next.js App Router (Pages, Layouts, API Routes)
+├── components/           # Reusable UI components & Visualizers
+├── lib/                  # Core logic (Auth, Email, Theme, Supabase Client)
+├── public/               # Static assets (Hero video, Brand icons)
+├── types/                # TypeScript interfaces & definitions
+└── supabase/             # Database schema & migrations
+```
+
+### Key Logic Modules
+- `lib/authSession.ts`: Manages Google Auth flow and session persistence.
+- `lib/accountEmails.ts`: Handles automated lifecycle communications.
+- `lib/themePreferences.ts`: Custom engine for synchronizing themes across sessions.
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js 20+ 
+- NPM / PNPM / Bun
+- A Supabase Project
+- Gmail App Password (for email features)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/sravankumar0103/VaultIX.git
+   cd VaultIX
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Configure Environment Variables**
+   Copy the [`.env.example`](.env.example) template to create your local environment file:
+   ```bash
+   cp .env.example .env.local
+   ```
+   *Open `.env.local` and fill in your Supabase and Gmail credentials. Note: This file is ignored by Git to keep your keys private.*
+
+4. **Start the development server**
+   ```bash
+   npm run dev
+   ```
+
+---
+
+## Deployment & Experience
+
+VaultIX is currently in **Production** and deployed on **Vercel**. 
+
+While fully responsive, the **optimal cinematic experience is best viewed on a Laptop or Desktop**.
+
+<div align="center">
+  <br />
+  <a href="https://vaultix-sk.vercel.app/">
+    <img src="https://img.shields.io/badge/ENTER_THE_VAULT-A855F7?style=for-the-badge" alt="Enter the Vault" />
+  </a>
+  <br />
+  <br />
+  <a href="https://vaultix-sk.vercel.app/">vaultix-sk.vercel.app</a>
+</div>
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+<div align="center">
+  <sub>Built with passion for the developer community. &copy; 2026 VaultIX.</sub>
+</div>
