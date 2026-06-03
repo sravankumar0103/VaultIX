@@ -336,6 +336,10 @@ export default function BookmarkCard({
       e.preventDefault();
       e.stopPropagation();
       setShowOverlay(true);
+    } else if (cardLink) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(cardLink as string, '_blank', 'noopener,noreferrer');
     }
   };
 
