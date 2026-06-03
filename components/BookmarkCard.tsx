@@ -227,6 +227,18 @@ export default function BookmarkCard({
     </div>
   )
 
+  const PdfPreview = ({ src }: { src: string }) => (
+    <div className="w-full h-full relative overflow-hidden flex items-center justify-center bg-white pointer-events-none">
+      <iframe 
+        src={`${src}#toolbar=0&navpanes=0&scrollbar=0&view=Fit`} 
+        className="absolute top-0 left-0 w-[400%] h-[400%] origin-top-left border-0"
+        style={{ transform: 'scale(0.25)' }}
+        tabIndex={-1}
+      />
+      <div className="absolute inset-0 bg-transparent z-10" />
+    </div>
+  )
+
   const [showOverlay, setShowOverlay] = useState(false);
 
   useEffect(() => {
@@ -375,12 +387,19 @@ export default function BookmarkCard({
                 )}
               </div>
             </div>
-          ) : isDirectVideoFile && bookmark.url ? (
+          ) : mediaType === 'video' && (bookmark.url || bookmark.media_url) ? (
             <div
               onClick={handleMediaClick}
               className="block relative w-full h-40 mb-5 overflow-hidden rounded-xl border border-white/5 bg-black/5 cursor-pointer"
             >
-              <VideoPreview src={bookmark.url} />
+              <VideoPreview src={(bookmark.url || bookmark.media_url) as string} />
+            </div>
+          ) : mediaType === 'pdf' && (bookmark.url || bookmark.media_url) ? (
+            <div
+              onClick={handleMediaClick}
+              className="block relative w-full h-40 mb-5 overflow-hidden rounded-xl border border-white/5 bg-black/5 cursor-pointer"
+            >
+              <PdfPreview src={(bookmark.url || bookmark.media_url) as string} />
             </div>
           ) : (effectiveMediaUrl && imgError) || mediaType !== 'generic' ? (
             <div
@@ -453,8 +472,27 @@ export default function BookmarkCard({
         >
           <div className="flex items-center gap-5 flex-1 min-w-0">
             <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-inner cursor-pointer" onClick={handleMediaClick}>
-              {bookmark.media_url ? (
-                <img src={bookmark.media_url} alt="media" className="w-full h-full object-cover" />
+              {effectiveMediaUrl && !imgError && !isDirectVideoFile ? (
+                <img 
+                  src={effectiveMediaUrl} 
+                  alt="media" 
+                  className="w-full h-full object-cover" 
+                  onError={() => {
+                    if (!useFallbackThumb && effectiveMediaUrl?.includes('youtube')) {
+                      setUseFallbackThumb(true);
+                    } else {
+                      setImgError(true);
+                    }
+                  }}
+                />
+              ) : mediaType === 'pdf' && (bookmark.url || bookmark.media_url) ? (
+                <PdfPreview src={(bookmark.url || bookmark.media_url) as string} />
+              ) : mediaType === 'video' && (bookmark.url || bookmark.media_url) ? (
+                <VideoPreview src={(bookmark.url || bookmark.media_url) as string} />
+              ) : mediaType === 'pdf' ? (
+                <FileText size={24} className="text-purple-400/80" strokeWidth={1.5} />
+              ) : mediaType === 'video' || isDirectVideoFile ? (
+                <Play size={24} className="text-purple-400/80" strokeWidth={1.5} />
               ) : favicon ? (
                 <img src={favicon} alt="logo" className="w-8 h-8 object-contain" />
               ) : (
@@ -559,12 +597,19 @@ export default function BookmarkCard({
               </span>
             )}
           </div>
-        ) : isDirectVideoFile && bookmark.url ? (
+        ) : mediaType === 'video' && (bookmark.url || bookmark.media_url) ? (
           <div
             onClick={handleMediaClick}
             className="block w-full h-48 sm:h-64 cursor-pointer"
           >
-            <VideoPreview src={bookmark.url} />
+            <VideoPreview src={(bookmark.url || bookmark.media_url) as string} />
+          </div>
+        ) : mediaType === 'pdf' && (bookmark.url || bookmark.media_url) ? (
+          <div
+            onClick={handleMediaClick}
+            className="block w-full h-48 sm:h-64 cursor-pointer"
+          >
+            <PdfPreview src={(bookmark.url || bookmark.media_url) as string} />
           </div>
         ) : (effectiveMediaUrl && imgError) || mediaType !== 'generic' ? (
           <div
