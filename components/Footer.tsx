@@ -1,5 +1,3 @@
-"use client";
-
 import React from 'react';
 import Image from 'next/image';
 import { Github, Twitter, Linkedin } from 'lucide-react';
@@ -26,14 +24,14 @@ export default function Footer() {
               Your digital life, intelligently indexed and strictly private.
             </p>
             <div className="flex items-center gap-5 pt-2">
-              <a href="#" className="group transition-colors">
-                <Twitter className="w-4 h-4 text-white/20 group-hover:text-white/80 transition-colors" />
+              <a href="#" aria-label="Twitter" className="group transition-colors">
+                <Twitter className="w-4 h-4 text-white/60 group-hover:text-white/80 transition-colors" />
               </a>
-              <a href="#" className="group transition-colors">
-                <Github className="w-4 h-4 text-white/20 group-hover:text-white/80 transition-colors" />
+              <a href="#" aria-label="GitHub" className="group transition-colors">
+                <Github className="w-4 h-4 text-white/60 group-hover:text-white/80 transition-colors" />
               </a>
-              <a href="#" className="group transition-colors">
-                <Linkedin className="w-4 h-4 text-white/20 group-hover:text-white/80 transition-colors" />
+              <a href="#" aria-label="LinkedIn" className="group transition-colors">
+                <Linkedin className="w-4 h-4 text-white/60 group-hover:text-white/80 transition-colors" />
               </a>
             </div>
           </div>
@@ -47,7 +45,7 @@ export default function Footer() {
                <ul className="space-y-4">
                  {['Features', 'Architecture', 'Smart Search', 'Analytics'].map((item) => (
                    <li key={item}>
-                     <a href="#" className="text-[13px] font-medium text-white/30 hover:text-white transition-colors">{item}</a>
+                     <a href="#" className="text-[13px] font-medium text-white/60 hover:text-white transition-colors">{item}</a>
                    </li>
                  ))}
                </ul>
@@ -59,7 +57,7 @@ export default function Footer() {
                <ul className="space-y-4">
                  {['API Reference', 'Open Source', 'GitHub Repo', 'Infrastructure'].map((item) => (
                    <li key={item}>
-                     <a href="#" className="text-[13px] font-medium text-white/30 hover:text-white transition-colors">{item}</a>
+                     <a href="#" className="text-[13px] font-medium text-white/60 hover:text-white transition-colors">{item}</a>
                    </li>
                  ))}
                </ul>
@@ -71,7 +69,7 @@ export default function Footer() {
                <ul className="space-y-4">
                  {['Contact Us', 'Help Center', 'Permanent Deletion'].map((item) => (
                    <li key={item}>
-                     <a href="#" className="text-[13px] font-medium text-white/30 hover:text-white transition-colors">{item}</a>
+                     <a href="#" className="text-[13px] font-medium text-white/60 hover:text-white transition-colors">{item}</a>
                    </li>
                  ))}
                </ul>
@@ -83,12 +81,12 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-white/[0.03] flex flex-col md:flex-row justify-between items-center gap-6">
-          <p className="text-[10px] text-white/20 font-semibold tracking-widest uppercase">
+          <p className="text-[10px] text-white/60 font-semibold tracking-widest uppercase">
             © {currentYear} VaultIX. All rights reserved.
           </p>
           <div className="flex items-center gap-8">
-            <a href="#" className="text-[10px] text-white/20 hover:text-white transition-colors font-semibold tracking-widest uppercase">Privacy Policy</a>
-            <a href="#" className="text-[10px] text-white/20 hover:text-white transition-colors font-semibold tracking-widest uppercase">Terms of Service</a>
+            <a href="#" className="text-[10px] text-white/60 hover:text-white transition-colors font-semibold tracking-widest uppercase">Privacy Policy</a>
+            <a href="#" className="text-[10px] text-white/60 hover:text-white transition-colors font-semibold tracking-widest uppercase">Terms of Service</a>
           </div>
         </div>
 

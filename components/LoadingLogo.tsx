@@ -3,50 +3,46 @@
 import { motion } from "framer-motion"
 import { useState, useEffect } from "react"
 
+const letters = ["V", "a", "u", "l", "t", "I", "X"]
+
+const containerVariants = {
+  animate: {
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+}
+
+const letterVariants = {
+  initial: { opacity: 0.3 },
+  animate: {
+    opacity: [0.3, 1, 0.3],
+    transition: {
+      duration: 0.8,
+      ease: "easeInOut" as const,
+      repeat: Infinity,
+      repeatDelay: 0.5,
+    },
+  },
+}
+
 export default function LoadingLogo({ loading = true, delayMs = 300, inline = false }: { loading?: boolean, delayMs?: number, inline?: boolean }) {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
-    let timer: number | undefined
+    if (!loading) return
 
-    if (loading) {
-      timer = window.setTimeout(() => {
-        setShow(true)
-      }, delayMs)
-    } else {
-      setShow(false)
-    }
-
+    const timer = window.setTimeout(() => {
+      setShow(true)
+    }, delayMs)
 
     return () => {
-      if (timer !== undefined) window.clearTimeout(timer)
+      window.clearTimeout(timer)
+      setShow(false)
     }
   }, [loading, delayMs])
 
-  if (!show) return null
-
-  const letters = ["V", "a", "u", "l", "t", "I", "X"]
-
-  const containerVariants = {
-    animate: {
-      transition: {
-        staggerChildren: 0.1,
-        repeat: Infinity,
-        repeatDelay: 0.5,
-      },
-    },
-  }
-
-  const letterVariants = {
-    initial: { opacity: 0.3 },
-    animate: {
-      opacity: [0.3, 1, 0.3],
-      transition: {
-        duration: 0.8,
-        ease: "easeInOut" as any,
-      },
-    },
-  }
+  if (!loading || !show) return null
 
   const logoContent = (
     <motion.div
@@ -68,12 +64,20 @@ export default function LoadingLogo({ loading = true, delayMs = 300, inline = fa
   )
 
   if (inline) {
-    return logoContent;
+    return logoContent
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center w-full h-screen bg-themeBg/40 backdrop-blur-[2px] animate-in fade-in duration-300">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+      role="status"
+      aria-live="polite"
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center w-full h-screen bg-themeBg/40 backdrop-blur-[2px]"
+    >
+      <span className="sr-only">Loading</span>
       {logoContent}
-    </div>
+    </motion.div>
   )
 }
