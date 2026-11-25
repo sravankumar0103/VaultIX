@@ -1,7 +1,17 @@
+"use client"
+
 import type { Bookmark } from "@/types/bookmark"
-import { useEffect, useState } from "react"
-import { ArchiveRestore, Archive, Trash2, Edit2, ExternalLink, Star, FileText, Play, X } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { memo, useEffect, useState } from "react"
+import { ExternalLink, FileText, Play } from "lucide-react"
+import { motion } from "framer-motion"
+import PriorityStars from "@/components/bookmark-card/PriorityStars"
+import CategoryBadge from "@/components/bookmark-card/CategoryBadge"
+import ActionButtons from "@/components/bookmark-card/ActionButtons"
+import ActionFooter from "@/components/bookmark-card/ActionFooter"
+import MediaPlaceholder from "@/components/bookmark-card/MediaPlaceholder"
+import VideoPreview from "@/components/bookmark-card/VideoPreview"
+import PdfPreview from "@/components/bookmark-card/PdfPreview"
+import MediaTheatreOverlay from "@/components/bookmark-card/MediaTheatreOverlay"
 
 type ViewType = "list" | "headlines" | "cards" | "moodboard"
 
@@ -14,7 +24,7 @@ type Props = {
   onEdit: (bookmark: Bookmark) => void
 }
 
-export default function BookmarkCard({
+function BookmarkCard({
   bookmark,
   viewType,
   onDelete,
@@ -94,150 +104,10 @@ export default function BookmarkCard({
       ? bookmark.media_url
       : bookmark.url?.startsWith("http") ? bookmark.url : bookmark.url ? `https://${bookmark.url}` : "#"
 
-  const mediaLink = bookmark.media_url as string
   const displayDate = bookmark.created_at
     ? new Date(bookmark.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
     : ""
   const domainName = bookmark.url ? (() => { try { return new URL(cardLink as string).hostname.replace("www.", "") } catch { return "" } })() : ""
-
-  /* ===================================================== */
-  /* ================== SHARED COMPONENTS ================ */
-  /* ===================================================== */
-
-  const PriorityStars = ({ className = "" }: { className?: string }) => (
-    <motion.div
-      initial={isMobile ? { opacity: 0 } : false}
-      whileInView={isMobile ? { opacity: 1 } : {}}
-      viewport={{ amount: 0.1, margin: "-10% 0px -10% 0px" }}
-      className={`flex gap-0.5 text-yellow-500 ${className}`}
-    >
-      {Array.from({ length: 3 }).map((_, i) => (
-        <Star
-          key={i}
-          size={14}
-          className={i < (bookmark.priority ?? 0) ? "fill-current" : "text-gray-300 dark:text-white/10"}
-        />
-      ))}
-    </motion.div>
-  )
-
-  const CategoryBadge = () => (
-    <span className="px-2.5 py-1 rounded-md bg-white/5 text-themeMuted text-xs font-semibold tracking-wide border border-white/10 group-hover:bg-purple-500/10 group-hover:text-purple-500 group-hover:border-purple-500/20 transition-all">
-      {bookmark.category || (isMedia ? "Media" : "URL")}
-    </span>
-  )
-
-  const ActionButtons = () => (
-    <motion.div
-      initial={isMobile ? { opacity: 0 } : false}
-      whileInView={isMobile ? { opacity: 1 } : {}}
-      viewport={{ amount: 0.1, margin: "-15% 0px -15% 0px" }}
-      transition={{ duration: 0.3 }}
-      className={`flex items-center gap-1 ${isMobile ? '' : 'opacity-0 group-hover:opacity-100 transition-opacity duration-200'}`}
-    >
-      <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(bookmark); }}
-        className="p-2 text-themeMuted hover:text-purple-500 hover:bg-purple-500/10 rounded-lg transition-colors"
-        title="Edit"
-      >
-        <Edit2 size={16} />
-      </button>
-
-      {bookmark.is_archived ? (
-        <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onUnarchive?.(bookmark.id); }}
-          className="p-2 text-themeMuted hover:text-green-500 hover:bg-green-500/10 rounded-lg transition-colors"
-          title="Unarchive"
-        >
-          <ArchiveRestore size={16} />
-        </button>
-      ) : (
-        <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onArchive(bookmark.id); }}
-          className="p-2 text-themeMuted hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-colors"
-          title="Archive"
-        >
-          <Archive size={16} />
-        </button>
-      )}
-
-      <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(bookmark.id); }}
-        className="p-2 text-themeMuted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-        title="Delete"
-      >
-        <Trash2 size={16} />
-      </button>
-    </motion.div>
-  )
-
-  const ActionFooter = () => (
-    <motion.div
-      initial={isMobile ? { opacity: 0, y: 10 } : false}
-      whileInView={isMobile ? { opacity: 1, y: 0 } : {}}
-      viewport={{ amount: 0.1, margin: "-15% 0px -15% 0px" }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
-      className={`p-3 bg-themeCard/90 backdrop-blur-md flex items-center justify-between border-t border-white/10 rounded-b-2xl absolute bottom-0 left-0 right-0 z-20 ${isMobile ? '' : 'hidden'}`}
-    >
-      <PriorityStars />
-      <ActionButtons />
-    </motion.div>
-  )
-
-  const MediaPlaceholder = () => (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[#0e0e11] to-[#1a1a1f] relative overflow-hidden group-hover:from-purple-500/10 group-hover:to-indigo-500/10 transition-all duration-700">
-      <div className="absolute inset-0 opacity-10 pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-purple-500/20 rounded-full blur-[60px]" />
-      </div>
-
-      {mediaType === 'pdf' ? (
-        <div className="relative z-10 flex flex-col items-center gap-4 w-full px-8">
-          <div className="w-full aspect-[3/4] max-w-[80px] bg-white/[0.03] border border-white/10 rounded-lg p-3 flex flex-col gap-2.5 group-hover:border-purple-500/20 transition-all shadow-2xl">
-            <div className="w-8 h-1.5 bg-purple-500/30 rounded-full mb-1" />
-            <div className="flex flex-col gap-2 opacity-10">
-              <div className="w-full h-1 bg-white rounded-full" />
-              <div className="w-full h-8 bg-white/20 rounded-md" />
-              <div className="w-3/4 h-1 bg-white rounded-full" />
-            </div>
-          </div>
-          <span className="text-[10px] font-black tracking-[0.4em] uppercase text-white/10 group-hover:text-purple-400/40 transition-colors">Vault PDF</span>
-        </div>
-      ) : (
-        <div className="relative z-10 flex flex-col items-center gap-5">
-          {mediaType === 'video' ? (
-            <Play size={48} className="text-purple-400/20 fill-purple-400/5 transition-transform group-hover:scale-110 duration-700 ml-1" strokeWidth={1} />
-          ) : (
-            <ExternalLink size={38} className="text-white/5" strokeWidth={1} />
-          )}
-          <span className="text-[10px] font-black tracking-[0.4em] uppercase text-white/10 group-hover:text-purple-400/40 transition-colors">
-            {mediaType === 'video' ? 'Video Stream' : 'Digital Asset'}
-          </span>
-        </div>
-      )}
-    </div>
-  )
-
-  const VideoPreview = ({ src }: { src: string }) => (
-    <div className="w-full h-full relative overflow-hidden flex items-center justify-center bg-black">
-      <video src={`${src}#t=0.1`} muted playsInline className="w-full h-full object-cover" onLoadedMetadata={(e) => { (e.target as HTMLVideoElement).currentTime = 0.1; }} />
-      <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Play size={32} className="text-white/80" />
-      </div>
-    </div>
-  )
-
-  const PdfPreview = ({ src }: { src: string }) => (
-    <div className="w-full h-full relative overflow-hidden flex items-center justify-center bg-white pointer-events-none">
-      <iframe 
-        src={`${src}#toolbar=0&navpanes=0&scrollbar=0&view=Fit`} 
-        className="absolute top-0 left-0 w-[400%] h-[400%] origin-top-left border-0"
-        style={{ transform: 'scale(0.25)' }}
-        tabIndex={-1}
-      />
-      <div className="absolute inset-0 bg-transparent z-10" />
-    </div>
-  )
 
   const [showOverlay, setShowOverlay] = useState(false);
 
@@ -255,93 +125,19 @@ export default function BookmarkCard({
     }
   }, [showOverlay]);
 
-  const MediaTheatreOverlay = () => {
-    if (!showOverlay) return null;
+  const actionProps = { bookmark, isMobile, onDelete, onArchive, onUnarchive, onEdit }
 
-    const isPdf = mediaType === 'pdf';
-    const isVideo = mediaType === 'video' || isDirectVideoFile;
-    const finalMediaUrl = isDirectVideoFile ? bookmark.url : (bookmark.url || bookmark.media_url);
-
-    return (
-      <AnimatePresence>
-        {showOverlay && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10"
-          >
-            {/* Backdrop */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="absolute inset-0 bg-[#030303]/90 backdrop-blur-2xl"
-              onClick={() => setShowOverlay(false)}
-            />
-
-            {/* Theatre Container */}
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full h-full max-w-6xl bg-zinc-950 rounded-[2.5rem] border border-white/10 shadow-[0_0_100px_rgba(168,85,247,0.15)] overflow-hidden flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/[0.02]">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20 text-purple-400">
-                    {isPdf ? <FileText size={20} /> : <Play size={20} />}
-                  </div>
-                  <div>
-                    <h2 className="text-white font-bold tracking-tight">{bookmark.title}</h2>
-                    <p className="text-themeMuted text-xs">{domainName || "VaultIX Internal"}</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setShowOverlay(false)}
-                  className="p-3 rounded-full hover:bg-white/5 text-themeMuted hover:text-white transition-all"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              {/* Viewer Content */}
-              <div className="flex-1 w-full h-full bg-black relative flex items-center justify-center">
-                {finalMediaUrl ? (
-                  isPdf ? (
-                    <iframe 
-                      src={finalMediaUrl} 
-                      className="w-full h-full border-0" 
-                      title="PDF Viewer"
-                    />
-                  ) : isVideo ? (
-                    <video 
-                      src={finalMediaUrl} 
-                      controls 
-                      autoPlay 
-                      className="max-w-full max-h-full"
-                    />
-                  ) : (
-                    <div className="text-center space-y-4">
-                      <ExternalLink size={48} className="text-white/10 mx-auto" strokeWidth={1} />
-                      <p className="text-themeMuted font-medium italic">Preview not available for this type.</p>
-                      <a href={cardLink as string} target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-2 bg-purple-500 rounded-full font-bold text-sm">Open in New Tab</a>
-                    </div>
-                  )
-                ) : (
-                  <div className="text-center space-y-4">
-                    <ExternalLink size={48} className="text-white/10 mx-auto" strokeWidth={1} />
-                    <p className="text-themeMuted font-medium italic">Source URL is missing.</p>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    );
-  };
+  const theatreOverlay = (
+    <MediaTheatreOverlay
+      show={showOverlay}
+      onClose={() => setShowOverlay(false)}
+      bookmark={bookmark}
+      mediaType={mediaType}
+      isDirectVideoFile={isDirectVideoFile}
+      cardLink={cardLink ?? undefined}
+      domainName={domainName}
+    />
+  )
 
   const handleMediaClick = (e: React.MouseEvent) => {
     if (mediaType !== 'generic' || isDirectVideoFile) {
@@ -406,7 +202,7 @@ export default function BookmarkCard({
               onClick={handleMediaClick}
               className="block relative w-full h-40 mb-5 overflow-hidden rounded-xl border border-white/5 bg-black/5 cursor-pointer"
             >
-              <MediaPlaceholder />
+              <MediaPlaceholder mediaType={mediaType} />
             </div>
           ) : (
             <div className="flex items-start justify-between mb-4">
@@ -419,7 +215,7 @@ export default function BookmarkCard({
                 {favicon ? <img src={favicon} alt="logo" className="w-7 h-7 object-contain" /> : <ExternalLink size={20} className="text-themeMuted" />}
               </a>
               <div className="absolute top-4 right-4 z-10 transition-opacity opacity-0 group-hover:opacity-100 duration-300">
-                <ActionButtons />
+                <ActionButtons {...actionProps} />
               </div>
             </div>
           )}
@@ -427,7 +223,7 @@ export default function BookmarkCard({
           <div className="flex-1 flex flex-col">
             {(effectiveMediaUrl || mediaType !== 'generic') && (
               <div className={`absolute top-4 right-4 z-10 bg-black/40 backdrop-blur-md rounded-xl p-1 transition-opacity duration-300 opacity-0 group-hover:opacity-100`}>
-                <ActionButtons />
+                <ActionButtons {...actionProps} />
               </div>
             )}
 
@@ -452,13 +248,13 @@ export default function BookmarkCard({
 
             <div className="mt-auto pt-4 border-t border-white/5 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <CategoryBadge />
-                <PriorityStars />
+                <CategoryBadge category={bookmark.category} isMedia={isMedia} />
+                <PriorityStars priority={bookmark.priority} isMobile={isMobile} />
               </div>
             </div>
           </div>
         </motion.div>
-        <MediaTheatreOverlay />
+        {theatreOverlay}
       </>
     )
   }
@@ -523,13 +319,13 @@ export default function BookmarkCard({
 
           <div className="flex items-center gap-6 shrink-0 ml-auto w-full sm:w-auto justify-between sm:justify-end border-t border-white/5 sm:border-0 pt-4 sm:pt-0 mt-4 sm:mt-0">
             <div className="flex items-center gap-4">
-              <CategoryBadge />
-              <PriorityStars />
+              <CategoryBadge category={bookmark.category} isMedia={isMedia} />
+              <PriorityStars priority={bookmark.priority} isMobile={isMobile} />
             </div>
-            <ActionButtons />
+            <ActionButtons {...actionProps} />
           </div>
         </motion.div>
-        <MediaTheatreOverlay />
+        {theatreOverlay}
       </>
     )
   }
@@ -560,12 +356,12 @@ export default function BookmarkCard({
           <div className="flex items-center gap-6 shrink-0">
             <div className="hidden md:flex items-center gap-4">
               <span className="text-xs text-themeMuted w-24 text-right">{displayDate}</span>
-              <PriorityStars />
+              <PriorityStars priority={bookmark.priority} isMobile={isMobile} />
             </div>
-            <ActionButtons />
+            <ActionButtons {...actionProps} />
           </div>
         </motion.div>
-        <MediaTheatreOverlay />
+        {theatreOverlay}
       </>
     )
   }
@@ -616,7 +412,7 @@ export default function BookmarkCard({
             onClick={handleMediaClick}
             className="block w-full h-48 sm:h-64 cursor-pointer"
           >
-            <MediaPlaceholder />
+            <MediaPlaceholder mediaType={mediaType} />
           </div>
         ) : (
           <div onClick={handleMediaClick} className="block w-full p-6 bg-purple-500/10 border-b border-white/5 cursor-pointer">
@@ -626,11 +422,11 @@ export default function BookmarkCard({
         )}
 
         {/* Universal Mobile Footer */}
-        <ActionFooter />
+        <ActionFooter {...actionProps} />
 
         {/* Action Indicators */}
         <div className={`absolute top-4 right-4 z-10 bg-black/40 backdrop-blur-md rounded-xl p-1 transition-opacity duration-300 opacity-0 group-hover:opacity-100`}>
-          <ActionButtons />
+          <ActionButtons {...actionProps} />
         </div>
 
         {/* Desktop Hover Panel */}
@@ -640,13 +436,15 @@ export default function BookmarkCard({
               <h4 className="font-medium text-sm text-themeText truncate cursor-pointer">{bookmark.title}</h4>
             )}
             <div className="flex items-center justify-between">
-              <PriorityStars />
-              <ActionButtons />
+              <PriorityStars priority={bookmark.priority} isMobile={isMobile} />
+              <ActionButtons {...actionProps} />
             </div>
           </div>
         )}
       </motion.div>
-      <MediaTheatreOverlay />
+      {theatreOverlay}
     </>
   )
 }
+
+export default memo(BookmarkCard)
