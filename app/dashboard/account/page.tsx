@@ -1,13 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import { useTheme } from "@/app/ThemeContext"
-import type { User } from "@supabase/supabase-js"
-import { useRouter } from "next/navigation"
+import { useDashboardUser } from "@/components/DashboardUserContext"
 import { motion, AnimatePresence } from "framer-motion"
 import { DEFAULT_THEME, getStoredDefaultTheme, isTheme, type Theme } from "@/lib/themePreferences"
-import { clearLocalAuthSession, clearReturningUser, recoverFromAuthError } from "@/lib/authSession"
+import { clearLocalAuthSession, clearReturningUser } from "@/lib/authSession"
 import { useToast } from "@/lib/useToast"
 import {
     User as UserIcon,
@@ -24,23 +23,26 @@ import {
     Shield,
     Palette,
 } from "lucide-react"
-import LoadingLogo from "@/components/LoadingLogo"
 
 export default function AccountPage() {
-    const router = useRouter()
     const { setDefaultTheme: applyDefaultTheme } = useTheme()
-    const [user, setUser] = useState<User | null>(null)
-    const [loading, setLoading] = useState(true)
+    const user = useDashboardUser()
 
     // Edit mode
     const [isEditing, setIsEditing] = useState(false)
 
     // Profile fields
-    const [displayName, setDisplayName] = useState("")
-    const [email, setEmail] = useState("")
+    const [displayName, setDisplayName] = useState<string>(
+        () => user.user_metadata?.full_name || user.user_metadata?.name || ""
+    )
+    const [email, setEmail] = useState(() => user.email || "")
 
     // Default theme preference (persisted with label)
-    const [defaultTheme, setDefaultTheme] = useState<Theme>(DEFAULT_THEME)
+    const [defaultTheme, setDefaultTheme] = useState<Theme>(() =>
+        isTheme(user.user_metadata?.theme_preference)
+            ? user.user_metadata.theme_preference
+            : getStoredDefaultTheme() ?? DEFAULT_THEME
+    )
 
     // Delete account
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -55,38 +57,7 @@ export default function AccountPage() {
     // Toast
     const { toast, showToast } = useToast(3500)
 
-    useEffect(() => {
-        const getUser = async () => {
-            const { data, error } = await supabase.auth.getUser()
-            if (error) {
-                const recovered = await recoverFromAuthError(error.message)
-                if (!recovered) {
-                    console.error("Failed to load user:", error)
-                }
-                router.push("/")
-                setLoading(false)
-                return
-            }
-
-            if (data?.user) {
-                setUser(data.user)
-                setDisplayName(data.user.user_metadata?.full_name || data.user.user_metadata?.name || "")
-                setEmail(data.user.email || "")
-                const accountTheme = isTheme(data.user.user_metadata?.theme_preference)
-                    ? data.user.user_metadata.theme_preference
-                    : getStoredDefaultTheme() ?? DEFAULT_THEME
-                setDefaultTheme(accountTheme)
-            } else {
-                router.push("/")
-            }
-            setLoading(false)
-        }
-        getUser()
-    }, [router])
-
     const handleSave = async () => {
-        if (!user) return
-
         // A failed update must not look like a save: restore the fields from the saved profile.
         let savedUser = user
         const failUpdate = () => {
@@ -105,7 +76,6 @@ export default function AccountPage() {
                 }
                 // Keep the saved profile current so a later failure restores the new name.
                 savedUser = data.user
-                setUser(data.user)
             }
             if (email !== user.email) {
                 const { error } = await supabase.auth.updateUser({ email })
@@ -220,12 +190,6 @@ export default function AccountPage() {
     const initials = displayName
         ? displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
         : email.slice(0, 2).toUpperCase()
-
-    if (loading) {
-        return (
-            <LoadingLogo />
-        )
-    }
 
     return (
         <div className="w-full max-w-3xl mx-auto flex flex-col gap-6 xl:gap-8 pb-16 pt-4">

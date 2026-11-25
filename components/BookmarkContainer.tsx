@@ -1,20 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabaseClient"
 import BookmarkCard from "@/components/BookmarkCard"
 import type { Bookmark } from "@/types/bookmark"
-import type { User } from "@supabase/supabase-js"
 import Toast from "@/components/Toast"
 import { Folder } from "lucide-react"
 import { useTheme } from "@/app/ThemeContext"
 import { motion, AnimatePresence } from "framer-motion"
 import LoadingLogo from "@/components/LoadingLogo"
-import { isDeletedAccountError, recoverFromAuthError } from "@/lib/authSession"
 import { useToast } from "@/lib/useToast"
-import { useBookmarks } from "@/lib/useBookmarks"
-import { validateBookmarkSubmission } from "@/lib/bookmarkInput"
+import { useDashboardUser } from "@/components/DashboardUserContext"
+import { isPendingId, useBookmarks } from "@/lib/useBookmarks"
+import { validateBookmarkSubmission, type BookmarkFormValues } from "@/lib/bookmarkInput"
 import {
   filterBookmarks,
   sortBookmarks,
@@ -30,9 +28,7 @@ import {
 } from "@/lib/viewPreferences"
 import BookmarkToolbar from "@/components/bookmarks/BookmarkToolbar"
 import BookmarkSubFilters from "@/components/bookmarks/BookmarkSubFilters"
-import BookmarkFormModal, {
-  type BookmarkFormValues,
-} from "@/components/bookmarks/BookmarkFormModal"
+import BookmarkFormModal from "@/components/bookmarks/BookmarkFormModal"
 import DeleteConfirmModal from "@/components/bookmarks/DeleteConfirmModal"
 
 const EMPTY_FORM: BookmarkFormValues = {
@@ -66,7 +62,7 @@ export default function BookmarkContainer({
   /* =========================
      State
   ========================= */
-  const [user, setUser] = useState<User | null>(null)
+  const user = useDashboardUser()
   const {
     bookmarks,
     isLoading,
@@ -91,84 +87,50 @@ export default function BookmarkContainer({
 
   const { toast, showToast, hideToast } = useToast()
 
-  const [viewMode, setViewMode] = useState<ViewMode>("cards")
-  const [sortBy, setSortBy] = useState<SortMode>("date-desc")
-
-  const router = useRouter()
+  // Read once on mount (this component only mounts in the browser, after the layout verified
+  // the session). Later token refreshes must not reset a view the user just picked.
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    () => resolveViewMode(localStorage.getItem(VIEW_MODE_KEY), user.user_metadata?.view_preference) ?? "cards"
+  )
+  const [sortBy, setSortBy] = useState<SortMode>(
+    () => resolveSortMode(localStorage.getItem(SORT_MODE_KEY), user.user_metadata?.sort_preference) ?? "date-desc"
+  )
 
   const { theme, toggleTheme } = useTheme()
 
   /* =========================
-     Auth & Preferences
+     Preferences
   ========================= */
-  useEffect(() => {
-    const getUserAndPrefs = async () => {
-      const storedView = localStorage.getItem(VIEW_MODE_KEY)
-      const storedSort = localStorage.getItem(SORT_MODE_KEY)
-      const applyPreferences = (meta: Record<string, unknown> | undefined) => {
-        const view = resolveViewMode(storedView, meta?.view_preference)
-        if (view) setViewMode(view)
-        const sort = resolveSortMode(storedSort, meta?.sort_preference)
-        if (sort) setSortBy(sort)
-      }
-      applyPreferences(undefined)
-
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser()
-        if (error) {
-          const recovered = await recoverFromAuthError(error.message)
-          if (recovered && isDeletedAccountError(error.message)) {
-            router.replace("/")
-            return
-          }
-          return
-        }
-
-        if (user) {
-          setUser(user)
-          applyPreferences(user.user_metadata)
-        }
-      } catch (err) {
-        console.error("Could not load the signed-in user:", err)
-      }
-    }
-    getUserAndPrefs()
-  }, [router])
-
   const updateViewMode = useCallback(
     async (v: ViewMode) => {
       setViewMode(v)
       localStorage.setItem(VIEW_MODE_KEY, v)
-      if (user) {
-        try {
-          const { error } = await supabase.auth.updateUser({
-            data: { view_preference: v },
-          })
-          if (error) console.error("Failed to sync view preference:", error)
-        } catch (err) {
-          console.error("Failed to sync view preference:", err)
-        }
+      try {
+        const { error } = await supabase.auth.updateUser({
+          data: { view_preference: v },
+        })
+        if (error) console.error("Failed to sync view preference:", error)
+      } catch (err) {
+        console.error("Failed to sync view preference:", err)
       }
     },
-    [user]
+    []
   )
 
   const updateSortBy = useCallback(
     async (s: SortMode) => {
       setSortBy(s)
       localStorage.setItem(SORT_MODE_KEY, s)
-      if (user) {
-        try {
-          const { error } = await supabase.auth.updateUser({
-            data: { sort_preference: s },
-          })
-          if (error) console.error("Failed to sync sort preference:", error)
-        } catch (err) {
-          console.error("Failed to sync sort preference:", err)
-        }
+      try {
+        const { error } = await supabase.auth.updateUser({
+          data: { sort_preference: s },
+        })
+        if (error) console.error("Failed to sync sort preference:", error)
+      } catch (err) {
+        console.error("Failed to sync sort preference:", err)
       }
     },
-    [user]
+    []
   )
 
   /* =========================
@@ -199,9 +161,9 @@ export default function BookmarkContainer({
         showToast(checked.message, "error")
         return
       }
-      const target = editingBookmark
+      const targetId = editingBookmark.id
       setEditingBookmark(null)
-      void updateBookmark(target, checked.value, file, checked.ext).then((result) =>
+      void updateBookmark(targetId, checked.value, file, checked.ext).then((result) =>
         showToast(result.message, result.ok ? "success" : "error")
       )
     },
@@ -375,6 +337,7 @@ export default function BookmarkContainer({
                 onArchive={handleArchive}
                 onUnarchive={handleUnarchive}
                 onEdit={setEditingBookmark}
+                isPending={isPendingId(b.id)}
               />
             ))}
           </motion.div>

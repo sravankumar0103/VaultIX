@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { supabase } from "@/lib/supabaseClient"
 import { motion } from "framer-motion"
-import { useRouter } from "next/navigation"
 import {
   TrendingUp,
   PieChart as PieIcon,
@@ -14,7 +13,7 @@ import {
 } from "lucide-react"
 import LoadingLogo from "@/components/LoadingLogo"
 import Toast from "@/components/Toast"
-import { isDeletedAccountError, recoverFromAuthError } from "@/lib/authSession"
+import { useDashboardUser } from "@/components/DashboardUserContext"
 import { buildAnalytics, type AnalyticsRow, type AnalyticsSummary } from "@/lib/analyticsWindow"
 import { useToast } from "@/lib/useToast"
 
@@ -45,11 +44,10 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true)
   const dashboardRef = useRef<HTMLDivElement>(null)
   const reportButtonRef = useRef<HTMLButtonElement>(null)
-  const router = useRouter()
   const { toast, showToast, hideToast } = useToast()
   const [data, setData] = useState<AnalyticsSummary>(EMPTY_SUMMARY)
-  // Task 28 replaces this state and the effect below with useDashboardUser().
-  const [userId, setUserId] = useState<string | null>(null)
+  // Depend on the id, never the User object: a token refresh hands out a new object.
+  const userId = useDashboardUser().id
 
   const exportToPDF = async () => {
     if (!dashboardRef.current) return
@@ -86,38 +84,8 @@ export default function AnalyticsPage() {
     }
   }
 
-  // Read the signed-in user once.
-  useEffect(() => {
-    let cancelled = false
-
-    const loadUser = async () => {
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      if (cancelled) return
-      if (userError) {
-        const recovered = await recoverFromAuthError(userError.message)
-        if (recovered && isDeletedAccountError(userError.message)) {
-          router.replace("/")
-        }
-        setLoading(false)
-        return
-      }
-      if (!user) {
-        setLoading(false)
-        return
-      }
-      setUserId(user.id)
-    }
-
-    loadUser()
-    return () => {
-      cancelled = true
-    }
-  }, [router])
-
   // One fetch on open, then a debounced refetch on this user's bookmark changes.
   useEffect(() => {
-    if (!userId) return
-
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -133,6 +101,7 @@ export default function AnalyticsPage() {
         return
       }
 
+      // The browser Supabase client is untyped, so rows arrive as any[].
       setData(buildAnalytics(rows as AnalyticsRow[], new Date()))
       setLoading(false)
     }

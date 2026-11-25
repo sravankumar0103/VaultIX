@@ -58,8 +58,9 @@ async function fetchUserBookmarks(userId: string): Promise<LoadResult> {
   }
 }
 
-export function useBookmarks(user: User | null) {
-  const userId = user?.id ?? null
+export function useBookmarks(user: User) {
+  // Depend on the id, never the User object: a token refresh hands out a new object.
+  const userId = user.id
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -77,7 +78,6 @@ export function useBookmarks(user: User | null) {
   // It does not touch the loading flags before the request, so the first load can run from an
   // effect (`isLoading` starts true); `reload` resets them first.
   const loadBookmarks = useCallback(() => {
-    if (!userId) return Promise.resolve()
     const seq = ++fetchSeq.current
     return fetchUserBookmarks(userId).then((result) => {
       if (seq !== fetchSeq.current) return
@@ -98,13 +98,13 @@ export function useBookmarks(user: User | null) {
   }, [loadBookmarks])
 
   useEffect(() => {
-    if (!userId) return
-
     const seqRef = fetchSeq
     void loadBookmarks()
 
+    // A unique topic per mount: realtime-js reuses a channel that is still leaving under the
+    // same topic, and subscribe() on a channel that is not closed does nothing.
     const channel = supabase
-      .channel(`bookmarks-realtime-${userId}`)
+      .channel(`bookmarks-realtime-${userId}-${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookmarks", filter: `user_id=eq.${userId}` },
@@ -129,7 +129,6 @@ export function useBookmarks(user: User | null) {
   const addBookmark = useCallback(
     async (values: ValidBookmarkInput, file: File | null, ext: string | null): Promise<MutationResult> => {
       const failure = fail("Failed to create bookmark")
-      if (!userId) return failure
 
       const ix = runIX(values.url ?? "", values.title)
       const priority = priorityFor(values, ix.importance)
@@ -184,23 +183,24 @@ export function useBookmarks(user: User | null) {
 
   const updateBookmark = useCallback(
     async (
-      original: Bookmark,
+      id: string,
       values: ValidBookmarkInput,
       file: File | null,
       ext: string | null
     ): Promise<MutationResult> => {
       const failureMessage = "Update failed — rolling back"
-      if (!userId) return fail(failureMessage)
-      if (isPendingId(original.id)) return fail(failureMessage)
-
-      const saved: Bookmark = { ...original }
+      if (isPendingId(id)) return fail(failureMessage)
+      // The row as it is now, not as it was when the edit modal opened.
+      const current = bookmarksRef.current.find((b) => b.id === id)
+      if (!current) return fail(NOT_CHANGED_MESSAGE)
+      const saved: Bookmark = { ...current }
       const ix = runIX(values.url ?? "", values.title)
       const patch: BookmarkPatch = {
         title: values.title,
         url: values.url,
         description: values.description,
         domain: ix.domain,
-        category: categoryFor(Boolean(file) || Boolean(original.media_url), Boolean(values.url)),
+        category: categoryFor(Boolean(file) || Boolean(saved.media_url), Boolean(values.url)),
         priority: priorityFor(values, ix.importance),
         tags: ix.tags,
       }
@@ -230,7 +230,6 @@ export function useBookmarks(user: User | null) {
   const deleteBookmark = useCallback(
     async (id: string): Promise<MutationResult> => {
       const failureMessage = "Delete failed — rolling back"
-      if (!userId) return fail(failureMessage)
       if (isPendingId(id)) return fail(failureMessage)
       const saved = bookmarksRef.current.find((b) => b.id === id)
       if (!saved) return fail(NOT_CHANGED_MESSAGE)
@@ -261,7 +260,6 @@ export function useBookmarks(user: User | null) {
   const setArchived = useCallback(
     async (id: string, archived: boolean): Promise<MutationResult> => {
       const failureMessage = archived ? "Archive failed" : "Unarchive failed"
-      if (!userId) return fail(failureMessage)
       if (isPendingId(id)) return fail(failureMessage)
       const saved = bookmarksRef.current.find((b) => b.id === id)
       if (!saved) return fail(NOT_CHANGED_MESSAGE)
