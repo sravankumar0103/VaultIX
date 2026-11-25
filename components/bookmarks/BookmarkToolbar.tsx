@@ -16,9 +16,7 @@ import {
   Settings2,
 } from "lucide-react"
 import type { Theme } from "@/lib/themePreferences"
-
-type SortMode = "date-desc" | "date-asc" | "name-asc" | "name-desc"
-type ViewMode = "cards" | "list" | "headlines" | "moodboard"
+import type { SortMode, ViewMode } from "@/lib/viewPreferences"
 
 type Props = {
   headerTitle: string
@@ -68,7 +66,7 @@ export default function BookmarkToolbar({
   const sortRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handlePointerDownOutside = (event: PointerEvent) => {
       const target = event.target as Node
       if (viewRef.current && !viewRef.current.contains(target)) {
         setIsViewOpen(false)
@@ -77,11 +75,27 @@ export default function BookmarkToolbar({
         setIsSortOpen(false)
       }
     }
-    document.addEventListener("click", handleClickOutside)
+    document.addEventListener("pointerdown", handlePointerDownOutside)
     return () => {
-      document.removeEventListener("click", handleClickOutside)
+      document.removeEventListener("pointerdown", handlePointerDownOutside)
     }
   }, [])
+
+  const greetingName =
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "there"
+
+  const toggleSort = () => {
+    setIsSortOpen((open) => !open)
+    setIsViewOpen(false)
+  }
+
+  const toggleView = () => {
+    setIsViewOpen((open) => !open)
+    setIsSortOpen(false)
+  }
 
   return (
     <>
@@ -90,7 +104,7 @@ export default function BookmarkToolbar({
         <div className="max-w-[calc(100vw-48px)]">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col">
             <h2 className="text-sm md:text-lg font-medium text-themeMuted mb-1 truncate">
-              Hey, {user?.user_metadata?.full_name || user?.user_metadata?.name || "Sravan Kumar"}.
+              Hey, {greetingName}.
             </h2>
             <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-themeText mb-2">
               {headerTitle}
@@ -121,6 +135,7 @@ export default function BookmarkToolbar({
           </div>
           <input
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-themeCard border border-white/10 text-themeText placeholder:text-themeMuted/70 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
+            aria-label="Search bookmarks"
             placeholder="Search by title, domain, tags..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -131,7 +146,9 @@ export default function BookmarkToolbar({
         <div className="flex items-center gap-2 w-full sm:w-auto overflow-y-visible pb-1 sm:pb-0 justify-center sm:justify-start">
           <div ref={sortRef} className="relative">
             <button
-              onClick={(e) => { e.stopPropagation(); setIsSortOpen(!isSortOpen); }}
+              onClick={toggleSort}
+              aria-haspopup="menu"
+              aria-expanded={isSortOpen}
               className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-themeText text-sm flex items-center gap-2 transition-all active:scale-95"
             >
               <ArrowUpDown size={16} className="text-themeMuted" />
@@ -155,7 +172,9 @@ export default function BookmarkToolbar({
 
           <div ref={viewRef} className="relative">
             <button
-              onClick={(e) => { e.stopPropagation(); setIsViewOpen(!isViewOpen); }}
+              onClick={toggleView}
+              aria-haspopup="menu"
+              aria-expanded={isViewOpen}
               className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-themeText text-sm flex items-center gap-2 transition-all active:scale-95"
             >
               <Settings2 size={16} className="text-themeMuted" />
@@ -184,6 +203,7 @@ export default function BookmarkToolbar({
             onClick={onToggleTheme}
             className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-themeMuted hover:text-purple-500 transition-all active:scale-95"
             title="Toggle Theme"
+            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
           >
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
