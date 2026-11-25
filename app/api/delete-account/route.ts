@@ -1,18 +1,16 @@
-import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
 import { sendAccountDeletedEmail } from "@/lib/accountEmails"
 import { releaseRequestLock, tryAcquireRequestLock } from "@/lib/requestLocks"
+import { getUserFromBearer } from "@/lib/server/auth"
+import { jsonError } from "@/lib/server/http"
+import { getSupabaseAdmin } from "@/lib/server/supabaseAdmin"
+
+export const runtime = "nodejs"
 
 const SKIP_DELETE_EMAIL_WEBHOOK_FLAG = "skip_account_deleted_email_webhook"
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
-
 async function restoreDeleteWebhookFlag(userId: string, appMetadata: Record<string, unknown>) {
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+  const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, {
     app_metadata: appMetadata,
   })
 
@@ -23,21 +21,12 @@ async function restoreDeleteWebhookFlag(userId: string, appMetadata: Record<stri
 
 export async function POST(req: NextRequest) {
   try {
-    const authHeader = req.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const user = await getUserFromBearer(req)
+    if (!user) {
+      return jsonError(401, "Unauthorized")
     }
 
-    const token = authHeader.replace("Bearer ", "")
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseAdmin.auth.getUser(token)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
-    }
-
+    const supabaseAdmin = getSupabaseAdmin()
     const userId = user.id
     const userEmail = user.email!
     const userName =
@@ -46,10 +35,7 @@ export async function POST(req: NextRequest) {
     const deleteLockKey = `delete-account:${userId}`
 
     if (!tryAcquireRequestLock(deleteLockKey, 60_000)) {
-      return NextResponse.json(
-        { error: "Account deletion already in progress" },
-        { status: 409 }
-      )
+      return jsonError(409, "Account deletion already in progress")
     }
 
     try {
@@ -65,10 +51,7 @@ export async function POST(req: NextRequest) {
 
       if (metadataError) {
         console.error("Failed to prepare deletion email handling:", metadataError)
-        return NextResponse.json(
-          { error: "Failed to prepare account deletion" },
-          { status: 500 }
-        )
+        return jsonError(500, "Failed to prepare account deletion")
       }
 
       const { data: userBookmarks } = await supabaseAdmin
@@ -107,10 +90,7 @@ export async function POST(req: NextRequest) {
         console.error("Complaints deletion error:", complaintsError)
         await restoreDeleteWebhookFlag(userId, originalAppMetadata)
 
-        return NextResponse.json(
-          { error: "Failed to purge user feedback data" },
-          { status: 500 }
-        )
+        return jsonError(500, "Failed to purge user feedback data")
       }
 
       const { error: bookmarksError } = await supabaseAdmin
@@ -122,10 +102,7 @@ export async function POST(req: NextRequest) {
         console.error("Bookmarks deletion error:", bookmarksError)
         await restoreDeleteWebhookFlag(userId, originalAppMetadata)
 
-        return NextResponse.json(
-          { error: "Failed to purge user bookmarks" },
-          { status: 500 }
-        )
+        return jsonError(500, "Failed to purge user bookmarks")
       }
 
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
@@ -133,10 +110,7 @@ export async function POST(req: NextRequest) {
         console.error("Auth delete error:", deleteError)
         await restoreDeleteWebhookFlag(userId, originalAppMetadata)
 
-        return NextResponse.json(
-          { error: `Auth deletion failed: ${deleteError.message}` },
-          { status: 500 }
-        )
+        return jsonError(500, `Auth deletion failed: ${deleteError.message}`)
       }
 
       try {
@@ -154,6 +128,6 @@ export async function POST(req: NextRequest) {
     }
   } catch (error) {
     console.error("Delete account error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return jsonError(500, "Internal server error")
   }
 }

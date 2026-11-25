@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sendAccountDeletedEmail } from "@/lib/accountEmails"
 import { releaseRequestLock, tryAcquireRequestLock } from "@/lib/requestLocks"
+import { secretsMatch } from "@/lib/server/auth"
+import { jsonError } from "@/lib/server/http"
 
 export const runtime = "nodejs"
 
@@ -16,14 +18,11 @@ export async function POST(req: NextRequest) {
 
   if (!webhookSecret) {
     console.error("Missing ACCOUNT_DELETE_WEBHOOK_SECRET for account delete webhook")
-    return NextResponse.json(
-      { error: "Account delete webhook is not configured" },
-      { status: 500 }
-    )
+    return jsonError(500, "Account delete webhook is not configured")
   }
 
-  if (req.headers.get("x-vaultix-webhook-secret") !== webhookSecret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!secretsMatch(req.headers.get("x-vaultix-webhook-secret"), webhookSecret)) {
+    return jsonError(401, "Unauthorized")
   }
 
   let payload: DeletedAccountPayload
@@ -31,12 +30,12 @@ export async function POST(req: NextRequest) {
   try {
     payload = await req.json()
   } catch {
-    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 })
+    return jsonError(400, "Invalid JSON payload")
   }
 
   const email = payload.email?.trim()
   if (!email) {
-    return NextResponse.json({ error: "Email is required" }, { status: 400 })
+    return jsonError(400, "Email is required")
   }
 
   const recipientName = payload.fullName?.trim() || payload.name?.trim() || null
@@ -58,10 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Account deleted webhook email failed:", error)
-    return NextResponse.json(
-      { error: "Failed to send deletion email" },
-      { status: 500 }
-    )
+    return jsonError(500, "Failed to send deletion email")
   } finally {
     releaseRequestLock(lockKey)
   }

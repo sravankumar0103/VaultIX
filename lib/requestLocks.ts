@@ -1,3 +1,6 @@
+// These locks live in this server instance's memory (on `globalThis`). They are best
+// effort only: they do not stop the same request running twice on another Vercel
+// instance or after a cold start, so never rely on them for correctness.
 const globalForRequestLocks = globalThis as typeof globalThis & {
   __vaultixRequestLocks?: Map<string, number>
 }

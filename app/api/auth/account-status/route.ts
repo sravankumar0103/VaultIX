@@ -1,22 +1,19 @@
-import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+import { getSupabaseAdmin } from "@/lib/server/supabaseAdmin"
+
+export const runtime = "nodejs"
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const body = (await req.json()) as { userId?: unknown } | null
     const userId = typeof body?.userId === "string" ? body.userId.trim() : ""
 
     if (!userId) {
       return NextResponse.json({ exists: false }, { status: 200 })
     }
 
-    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId)
+    const { data, error } = await getSupabaseAdmin().auth.admin.getUserById(userId)
 
     if (error || !data.user) {
       return NextResponse.json({ exists: false }, { status: 200 })

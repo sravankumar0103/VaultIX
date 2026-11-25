@@ -1,5 +1,7 @@
 import nodemailer, { type Transporter } from "nodemailer"
 
+import { requireEnv } from "@/lib/env"
+
 const globalForMailer = globalThis as typeof globalThis & {
   __vaultixMailTransporter?: Transporter
 }
@@ -9,8 +11,8 @@ export function getMailTransporter() {
     globalForMailer.__vaultixMailTransporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS,
+        user: requireEnv("GMAIL_USER"),
+        pass: requireEnv("GMAIL_PASS"),
       },
     })
   }
