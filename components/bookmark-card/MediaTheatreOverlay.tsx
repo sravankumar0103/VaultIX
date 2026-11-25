@@ -3,6 +3,8 @@
 import type { Bookmark } from "@/types/bookmark"
 import { FileText, Play, X, ExternalLink } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useId } from "react"
+import { useDialog } from "@/lib/useDialog"
 
 type Props = {
   show: boolean
@@ -23,11 +25,17 @@ export default function MediaTheatreOverlay({
 }: Props) {
   const isPdf = mediaKind === "pdf"
   const isVideo = mediaKind === "video"
+  const { dialogRef } = useDialog(show, onClose)
+  const headingId = useId()
 
   return (
     <AnimatePresence>
       {show && (
         <motion.div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={headingId}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -56,12 +64,14 @@ export default function MediaTheatreOverlay({
                   {isPdf ? <FileText size={20} /> : <Play size={20} />}
                 </div>
                 <div>
-                  <h2 className="text-white font-bold tracking-tight">{bookmark.title}</h2>
+                  <h2 id={headingId} className="text-white font-bold tracking-tight">{bookmark.title}</h2>
                   <p className="text-themeMuted text-xs">{domainName || "VaultIX Internal"}</p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={onClose}
+                aria-label="Close viewer"
                 className="p-3 rounded-full hover:bg-white/5 text-themeMuted hover:text-white transition-all"
               >
                 <X size={20} />

@@ -24,11 +24,20 @@ const IMAGE_CLASSES = {
   moodboard: "w-full object-cover",
 } as const
 
+// A real button laid over the tile (the tile holds previews that must not sit inside a button)
+const OPEN_BUTTON_CLASSES =
+  "absolute inset-0 z-10 block w-full h-full rounded-[inherit] cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-purple-500"
+
 export default function MediaThumb({ bookmark, mediaKind, variant, onOpen }: Props) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  const [useFallbackThumb, setUseFallbackThumb] = useState(false)
+  // The link whose maxres thumbnail failed: a different link starts again from maxres
+  const [fallbackLink, setFallbackLink] = useState<string | null>(null)
 
   const { fileUrl, linkUrl, directVideoUrl, thumbLinkUrl, hasVisual } = resolveMedia(bookmark)
+  const useFallbackThumb = thumbLinkUrl !== null && fallbackLink === thumbLinkUrl
+  const openButton = (
+    <button type="button" onClick={onOpen} aria-label={`Open ${bookmark.title}`} className={OPEN_BUTTON_CLASSES} />
+  )
   const hasBoth = !!bookmark.media_url && !!bookmark.url
   const favicon = getFaviconUrl(linkUrl)
 
@@ -39,8 +48,8 @@ export default function MediaThumb({ bookmark, mediaKind, variant, onOpen }: Pro
 
   const handleImageError = () => {
     if (!imageSrc) return
-    if (!useFallbackThumb && imageSrc.includes("img.youtube.com")) {
-      setUseFallbackThumb(true)
+    if (!useFallbackThumb && thumbLinkUrl && imageSrc.includes("img.youtube.com")) {
+      setFallbackLink(thumbLinkUrl)
     } else {
       setFailedSrc(imageSrc)
     }
@@ -74,30 +83,29 @@ export default function MediaThumb({ bookmark, mediaKind, variant, onOpen }: Pro
     else if (!mediaKind && directVideoUrl) content = <VideoPreview src={directVideoUrl} />
     else if (mediaKind === "pdf") content = <FileText size={24} className="text-purple-400/80" strokeWidth={1.5} />
     else if (mediaKind === "video") content = <Play size={24} className="text-purple-400/80" strokeWidth={1.5} />
-    else if (favicon) content = <img src={favicon} alt="logo" className="w-8 h-8 object-contain" loading="lazy" decoding="async" />
+    else if (favicon) content = <img src={favicon} alt="" className="w-8 h-8 object-contain" loading="lazy" decoding="async" />
     else content = <ExternalLink size={24} className="text-themeMuted" />
 
     return (
-      <div
-        className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-inner cursor-pointer"
-        onClick={onOpen}
-      >
+      <div className="relative isolate w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
         {content}
+        {openButton}
       </div>
     )
   }
 
   /* ---------------- card and moodboard ---------------- */
   const boxClasses = variant === "card"
-    ? "relative w-full h-40 mb-5 overflow-hidden rounded-xl border border-white/5 bg-black/5 cursor-pointer group/img"
-    : "block w-full h-48 sm:h-64 cursor-pointer"
+    ? "relative w-full h-40 mb-5 overflow-hidden rounded-xl border border-white/5 bg-black/5 isolate group/img"
+    : "relative isolate block w-full h-48 sm:h-64"
 
   if (hasVisual) {
     if (image) {
       return (
-        <div onClick={onOpen} className={variant === "card" ? boxClasses : "block w-full relative group/img cursor-pointer"}>
+        <div className={variant === "card" ? boxClasses : "block w-full relative isolate group/img"}>
           {image}
           {badge}
+          {openButton}
         </div>
       )
     }
@@ -107,8 +115,9 @@ export default function MediaThumb({ bookmark, mediaKind, variant, onOpen }: Pro
     else if (!mediaKind && directVideoUrl) content = <VideoPreview src={directVideoUrl} />
     else content = <MediaPlaceholder mediaType={placeholderKind} />
     return (
-      <div onClick={onOpen} className={boxClasses}>
+      <div className={boxClasses}>
         {content}
+        {openButton}
       </div>
     )
   }
@@ -117,12 +126,12 @@ export default function MediaThumb({ bookmark, mediaKind, variant, onOpen }: Pro
   if (variant === "card") {
     const tileClasses = "w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0"
     const tile = favicon
-      ? <img src={favicon} alt="logo" className="w-7 h-7 object-contain" loading="lazy" decoding="async" />
+      ? <img src={favicon} alt="" className="w-7 h-7 object-contain" loading="lazy" decoding="async" />
       : <ExternalLink size={20} className="text-themeMuted" />
     return (
       <div className="flex items-start justify-between mb-4">
         {linkUrl ? (
-          <a href={linkUrl} target="_blank" rel="noopener noreferrer" className={tileClasses}>{tile}</a>
+          <a href={linkUrl} target="_blank" rel="noopener noreferrer" aria-label="Open link" className={tileClasses}>{tile}</a>
         ) : (
           <span className={tileClasses}>{tile}</span>
         )}
@@ -131,9 +140,10 @@ export default function MediaThumb({ bookmark, mediaKind, variant, onOpen }: Pro
   }
 
   return (
-    <div onClick={onOpen} className="block w-full p-6 bg-purple-500/10 border-b border-white/5 cursor-pointer">
+    <div className="relative isolate block w-full p-6 bg-purple-500/10 border-b border-white/5">
       <h3 className="font-bold text-xl text-themeText mb-2 leading-tight">{bookmark.title}</h3>
       <p className="text-sm text-themeMuted line-clamp-3">{bookmark.description || (linkUrl ? getHostname(linkUrl) : "")}</p>
+      {openButton}
     </div>
   )
 }

@@ -15,7 +15,7 @@ export default function PriorityStars({ priority, isMobile, className = "" }: Pr
       key={isMobile ? "m" : "d"}
       initial={isMobile ? { opacity: 0 } : false}
       whileInView={isMobile ? { opacity: 1 } : {}}
-      viewport={{ amount: 0.1, margin: "-10% 0px -10% 0px" }}
+      viewport={{ once: true, amount: 0.1, margin: "-10% 0px -10% 0px" }}
       className={`flex gap-0.5 text-yellow-500 ${className}`}
     >
       {Array.from({ length: 3 }).map((_, i) => (

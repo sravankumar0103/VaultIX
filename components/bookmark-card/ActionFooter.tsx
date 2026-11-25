@@ -14,7 +14,7 @@ export default function ActionFooter(props: Props) {
       key={isMobile ? "m" : "d"}
       initial={isMobile ? { opacity: 0, y: 10 } : false}
       whileInView={isMobile ? { opacity: 1, y: 0 } : {}}
-      viewport={{ amount: 0.1, margin: "-15% 0px -15% 0px" }}
+      viewport={{ once: true, amount: 0.1, margin: "-15% 0px -15% 0px" }}
       transition={{ duration: 0.4, ease: "easeOut" }}
       className={`p-3 bg-themeCard/90 backdrop-blur-md flex items-center justify-between border-t border-white/10 rounded-b-2xl absolute bottom-0 left-0 right-0 z-20 ${isMobile ? "" : "hidden"}`}
     >

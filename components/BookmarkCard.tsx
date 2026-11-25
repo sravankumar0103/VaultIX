@@ -4,6 +4,7 @@ import type { Bookmark } from "@/types/bookmark"
 import { memo, useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { getMediaKind } from "@/lib/mediaType"
+import { useMediaQuery } from "@/lib/useMediaQuery"
 import { getHostname } from "@/lib/url"
 import { formatShortDate } from "@/lib/formatDate"
 import PriorityStars from "@/components/bookmark-card/PriorityStars"
@@ -35,14 +36,7 @@ function BookmarkCard({
   onEdit,
   isPending = false,
 }: Props) {
-  const [isMobile, setIsMobile] = useState(false)
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768)
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
+  const isMobile = useMediaQuery("(max-width: 767px)")
 
   /* ===================================================== */
   /* ================= MEDIA RESOLUTION =================== */
@@ -58,15 +52,11 @@ function BookmarkCard({
   const [showOverlay, setShowOverlay] = useState(false);
 
   useEffect(() => {
+    // Escape and focus are handled by the theatre's useDialog
     if (showOverlay) {
       document.body.style.overflow = 'hidden';
-      const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') setShowOverlay(false);
-      };
-      window.addEventListener('keydown', handleEscape);
       return () => {
         document.body.style.overflow = 'unset';
-        window.removeEventListener('keydown', handleEscape);
       };
     }
   }, [showOverlay]);
@@ -117,11 +107,12 @@ function BookmarkCard({
           <MediaThumb bookmark={bookmark} mediaKind={mediaKind} variant="card" onOpen={openMedia} />
 
           <div className="flex-1 flex flex-col">
-            <div className={`absolute top-4 right-4 z-10 transition-opacity duration-300 opacity-0 group-hover:opacity-100 ${hasVisual ? "bg-black/40 backdrop-blur-md rounded-xl p-1" : ""}`}>
+            <div className={`absolute top-4 right-4 z-10 transition-opacity duration-300 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 ${hasVisual ? "bg-black/40 backdrop-blur-md rounded-xl p-1" : ""}`}>
               <ActionButtons {...actionProps} />
             </div>
 
             <button
+              type="button"
               onClick={handleLinkClick}
               className="group/link block text-left"
             >
@@ -163,9 +154,10 @@ function BookmarkCard({
           <div className="flex items-center gap-5 flex-1 min-w-0">
             <MediaThumb bookmark={bookmark} mediaKind={mediaKind} variant="list" onOpen={openMedia} />
 
-            <div
+            <button
+              type="button"
               onClick={handleLinkClick}
-              className="flex flex-col gap-1 min-w-0 group/link cursor-pointer"
+              className="flex flex-col gap-1 min-w-0 group/link cursor-pointer text-left"
             >
               <h3 className="font-bold text-lg text-themeText truncate group-hover/link:text-purple-500 transition-colors">
                 {bookmark.title}
@@ -175,9 +167,10 @@ function BookmarkCard({
                 {domainName && <span className="w-1 h-1 rounded-full bg-gray-400/50"></span>}
                 <span>{displayDate}</span>
               </div>
-            </div>
+            </button>
           </div>
 
+          {/* Mouse-only extra click area: the title button above is the keyboard path to the same action */}
           <div className="hidden lg:block flex-1 border-l border-white/5 pl-6" onClick={handleLinkClick}>
             <p className="text-sm text-themeMuted line-clamp-2 cursor-pointer">
               {bookmark.description || <span className="italic opacity-50">No description provided</span>}
@@ -203,12 +196,13 @@ function BookmarkCard({
         <motion.div
           className="group flex items-center justify-between py-3 px-4 rounded-xl hover:bg-white/5 transition-colors border border-transparent hover:border-white/5 cursor-default"
         >
-          <div
+          <button
+            type="button"
             onClick={handleLinkClick}
-            className="flex items-center gap-4 min-w-0 pr-4 flex-1 group/link cursor-pointer"
+            className="flex items-center gap-4 min-w-0 pr-4 flex-1 group/link cursor-pointer text-left"
           >
             <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
-              {favicon ? <img src={favicon} alt="logo" className="w-5 h-5 object-contain" loading="lazy" decoding="async" /> : <div className="w-2 h-2 rounded-full bg-purple-500" />}
+              {favicon ? <img src={favicon} alt="" className="w-5 h-5 object-contain" loading="lazy" decoding="async" /> : <div className="w-2 h-2 rounded-full bg-purple-500" />}
             </div>
 
             <h3 className="font-medium text-themeText truncate group-hover/link:text-purple-500 transition-colors">
@@ -218,7 +212,7 @@ function BookmarkCard({
             <span className="text-xs text-themeMuted hidden sm:inline-block truncate max-w-[200px]">
               {domainName}
             </span>
-          </div>
+          </button>
 
           <div className="flex items-center gap-6 shrink-0">
             <div className="hidden md:flex items-center gap-4">
@@ -246,9 +240,12 @@ function BookmarkCard({
 
         {/* Desktop Hover Panel */}
         {!isMobile && (
-          <div className="p-4 bg-themeCard/90 backdrop-blur-md absolute bottom-0 left-0 right-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex flex-col gap-3 border-t border-white/10" onClick={handleLinkClick}>
+          <div className="p-4 bg-themeCard/90 backdrop-blur-md absolute bottom-0 left-0 right-0 translate-y-full group-hover:translate-y-0 group-focus-within:translate-y-0 [@media(hover:none)]:translate-y-0 transition-transform duration-300 flex flex-col gap-3 border-t border-white/10" onClick={handleLinkClick}>
+            {/* The panel click is a mouse extra; the title button is the keyboard path to the same action */}
             {hasVisual && (
-              <h4 className="font-medium text-sm text-themeText truncate cursor-pointer">{bookmark.title}</h4>
+              <h4 className="font-medium text-sm text-themeText truncate">
+                <button type="button" onClick={handleLinkClick} className="block w-full truncate text-left cursor-pointer">{bookmark.title}</button>
+              </h4>
             )}
             <div className="flex items-center justify-between">
               <PriorityStars priority={bookmark.priority} isMobile={isMobile} />
