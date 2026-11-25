@@ -41,6 +41,15 @@ const EMPTY_FORM: BookmarkFormValues = {
 const VIEW_MODE_KEY = "vaultix-view-mode"
 const SORT_MODE_KEY = "vaultix-sort-mode"
 
+// localStorage throws when storage is blocked (Safari private mode); treat that as "nothing stored".
+function readStored(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
 // The old "grid" value always wins; otherwise the account preference beats the local one,
 // and anything that is not a known mode is ignored.
 function resolveViewMode(stored: string | null, accountValue: unknown): ViewMode | null {
@@ -90,10 +99,10 @@ export default function BookmarkContainer({
   // Read once on mount (this component only mounts in the browser, after the layout verified
   // the session). Later token refreshes must not reset a view the user just picked.
   const [viewMode, setViewMode] = useState<ViewMode>(
-    () => resolveViewMode(localStorage.getItem(VIEW_MODE_KEY), user.user_metadata?.view_preference) ?? "cards"
+    () => resolveViewMode(readStored(VIEW_MODE_KEY), user.user_metadata?.view_preference) ?? "cards"
   )
   const [sortBy, setSortBy] = useState<SortMode>(
-    () => resolveSortMode(localStorage.getItem(SORT_MODE_KEY), user.user_metadata?.sort_preference) ?? "date-desc"
+    () => resolveSortMode(readStored(SORT_MODE_KEY), user.user_metadata?.sort_preference) ?? "date-desc"
   )
 
   const { theme, toggleTheme } = useTheme()

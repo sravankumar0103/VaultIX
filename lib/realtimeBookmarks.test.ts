@@ -7,6 +7,15 @@ const mine = (id: string, extra: Partial<Bookmark> = {}): Bookmark => ({
   user_id: "u1",
   title: `t-${id}`,
   url: `https://a.test/${id}`,
+  description: null,
+  domain: null,
+  category: null,
+  priority: null,
+  media_url: null,
+  tags: null,
+  is_archived: null,
+  created_at: null,
+  updated_at: null,
   ...extra,
 })
 

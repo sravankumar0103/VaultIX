@@ -2,7 +2,21 @@ import { describe, it, expect } from "vitest"
 import type { Bookmark } from "@/types/bookmark"
 import { filterBookmarks, sortBookmarks } from "@/lib/filterBookmarks"
 
-const mk = (o: Partial<Bookmark> & { id: string }): Bookmark => ({ user_id: "u", title: o.id, url: null, ...o })
+const mk = (o: Partial<Bookmark> & { id: string }): Bookmark => ({
+  user_id: "u",
+  title: o.id,
+  url: null,
+  description: null,
+  domain: null,
+  category: null,
+  priority: null,
+  media_url: null,
+  tags: null,
+  is_archived: null,
+  created_at: null,
+  updated_at: null,
+  ...o,
+})
 const f = { mode: "all" as const, search: "", priority: "All" as const, category: "All" as const }
 const ids = (l: Bookmark[]) => l.map((b) => b.id)
 

@@ -771,6 +771,7 @@ function FilterSortVisualizer() {
                   <Box className="w-4 h-4 text-indigo-400" />
                 </div>
               ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- favicons and thumbnails come from arbitrary external hosts that next/image cannot allow-list
                 <img src={b.favicon} alt="favicon" className="w-[18px] h-[18px] object-contain" />
               )}
             </div>

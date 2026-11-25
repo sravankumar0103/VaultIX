@@ -138,6 +138,7 @@ export default function AccountPage() {
             sessionStorage.clear()
             clearReturningUser()
             await clearLocalAuthSession()
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate full-page navigation after the account is deleted
             window.location.href = "/?deleted=true"
         } catch {
             showToast("Failed to delete account", "error")

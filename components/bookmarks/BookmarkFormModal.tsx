@@ -5,8 +5,6 @@ import { motion } from "framer-motion"
 import { useDialog } from "@/lib/useDialog"
 import type { BookmarkFormValues } from "@/lib/bookmarkInput"
 
-export type { BookmarkFormValues }
-
 type Props = {
   mode: "add" | "edit"
   initial: BookmarkFormValues

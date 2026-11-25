@@ -64,6 +64,7 @@ export default function MediaThumb({ bookmark, mediaKind, variant, onOpen }: Pro
   )
 
   const image = showImage ? (
+    // eslint-disable-next-line @next/next/no-img-element -- favicons and thumbnails come from arbitrary external hosts that next/image cannot allow-list
     <img
       src={imageSrc}
       alt={bookmark.title}
@@ -83,6 +84,7 @@ export default function MediaThumb({ bookmark, mediaKind, variant, onOpen }: Pro
     else if (!mediaKind && directVideoUrl) content = <VideoPreview src={directVideoUrl} />
     else if (mediaKind === "pdf") content = <FileText size={24} className="text-purple-400/80" strokeWidth={1.5} />
     else if (mediaKind === "video") content = <Play size={24} className="text-purple-400/80" strokeWidth={1.5} />
+    // eslint-disable-next-line @next/next/no-img-element -- favicons and thumbnails come from arbitrary external hosts that next/image cannot allow-list
     else if (favicon) content = <img src={favicon} alt="" className="w-8 h-8 object-contain" loading="lazy" decoding="async" />
     else content = <ExternalLink size={24} className="text-themeMuted" />
 
@@ -126,6 +128,7 @@ export default function MediaThumb({ bookmark, mediaKind, variant, onOpen }: Pro
   if (variant === "card") {
     const tileClasses = "w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0"
     const tile = favicon
+      // eslint-disable-next-line @next/next/no-img-element -- favicons and thumbnails come from arbitrary external hosts that next/image cannot allow-list
       ? <img src={favicon} alt="" className="w-7 h-7 object-contain" loading="lazy" decoding="async" />
       : <ExternalLink size={20} className="text-themeMuted" />
     return (

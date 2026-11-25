@@ -1,5 +1,5 @@
 type Props = {
-  category?: string
+  category?: string | null
   isMedia: boolean
 }
 

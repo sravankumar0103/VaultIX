@@ -3,7 +3,22 @@ import type { Bookmark } from "@/types/bookmark"
 import { getFaviconUrl, resolveMedia } from "@/components/bookmark-card/resolveMedia"
 
 function make(overrides: Partial<Bookmark>): Bookmark {
-  return { id: "b1", user_id: "u1", title: "Untitled", url: null, ...overrides }
+  return {
+    id: "b1",
+    user_id: "u1",
+    title: "Untitled",
+    url: null,
+    description: null,
+    domain: null,
+    category: null,
+    priority: null,
+    media_url: null,
+    tags: null,
+    is_archived: null,
+    created_at: null,
+    updated_at: null,
+    ...overrides,
+  }
 }
 
 const FILE = "https://x.supabase.co/storage/v1/object/public/media/"

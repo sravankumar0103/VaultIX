@@ -30,6 +30,12 @@ function failureFor(err: unknown, fallback: string): MutationResult {
   return fail(err instanceof BookmarkNotChangedError ? NOT_CHANGED_MESSAGE : fallback)
 }
 
+// A channel topic only needs to be unique per mount; it is not a security token, and
+// crypto.randomUUID() does not exist outside secure contexts.
+function uniqueTopicSuffix(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 export function isPendingId(id: string): boolean {
   return id.startsWith("opt-")
 }
@@ -104,7 +110,7 @@ export function useBookmarks(user: User) {
     // A unique topic per mount: realtime-js reuses a channel that is still leaving under the
     // same topic, and subscribe() on a channel that is not closed does nothing.
     const channel = supabase
-      .channel(`bookmarks-realtime-${userId}-${crypto.randomUUID()}`)
+      .channel(`bookmarks-realtime-${userId}-${uniqueTopicSuffix()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "bookmarks", filter: `user_id=eq.${userId}` },
@@ -149,6 +155,7 @@ export function useBookmarks(user: User) {
         tags: ix.tags,
         is_archived: false,
         created_at: new Date().toISOString(),
+        updated_at: null,
       }
       setBookmarks((prev) => [optimistic, ...prev])
 

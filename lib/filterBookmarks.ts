@@ -4,7 +4,7 @@ import type { SortMode } from "@/lib/viewPreferences"
 export type BookmarkMode = "all" | "archived" | "categories" | "priority"
 export type CategoryFilter = "All" | "URL" | "Media"
 
-function matchesCategory(category: string | undefined, filter: CategoryFilter): boolean {
+function matchesCategory(category: string | null | undefined, filter: CategoryFilter): boolean {
   if (filter === "All") return true
   return category === filter || category === "Media+URL"
 }
@@ -38,7 +38,7 @@ export function filterBookmarks(
   })
 }
 
-function time(value: string | undefined): number {
+function time(value: string | null | undefined): number {
   const t = value ? new Date(value).getTime() : 0
   return Number.isNaN(t) ? 0 : t
 }

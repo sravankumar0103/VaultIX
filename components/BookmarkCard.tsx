@@ -202,6 +202,7 @@ function BookmarkCard({
             className="flex items-center gap-4 min-w-0 pr-4 flex-1 group/link cursor-pointer text-left"
           >
             <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element -- favicons and thumbnails come from arbitrary external hosts that next/image cannot allow-list */}
               {favicon ? <img src={favicon} alt="" className="w-5 h-5 object-contain" loading="lazy" decoding="async" /> : <div className="w-2 h-2 rounded-full bg-purple-500" />}
             </div>
 
