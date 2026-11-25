@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from 'react';
+import React, { memo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import {
   Search,
@@ -23,7 +23,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 
-export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => void }) {
+function LandingFeatures({ onOpenVault }: { onOpenVault?: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -228,7 +228,19 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
   );
 }
 
-function HybridRefinedSection({ number, title, desc, badge, visual, reversed, plain }: any) {
+export default memo(LandingFeatures);
+
+type HybridRefinedSectionProps = {
+  number: string
+  title: string
+  desc: string
+  badge: string
+  visual: ReactNode
+  reversed?: boolean
+  plain?: boolean
+}
+
+function HybridRefinedSection({ number, title, desc, badge, visual, reversed, plain }: HybridRefinedSectionProps) {
   return (
     <div className={`flex flex-col md:flex-row items-center gap-20 md:gap-40 ${reversed ? 'md:flex-row-reverse' : ''}`}>
       <motion.div
@@ -276,7 +288,15 @@ function HybridRefinedSection({ number, title, desc, badge, visual, reversed, pl
   );
 }
 
-function BentoCard({ className, icon, title, desc, visual }: any) {
+type BentoCardProps = {
+  className: string
+  icon: ReactElement<{ size?: number }>
+  title: string
+  desc: string
+  visual: ReactNode
+}
+
+function BentoCard({ className, icon, title, desc, visual }: BentoCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -462,6 +482,13 @@ function WipeVisualizer() {
 /* --- INFRASTRUCTURE VISUALIZERS (SUPERSEDED BY HIGH-FIDELITY) --- */
 
 function NeuralCubeVisualizer() {
+  const [particles] = useState(() =>
+    [...Array(6)].map(() => ({
+      x: [Math.random() * 40 - 20, Math.random() * 80 - 40],
+      y: [Math.random() * 40 - 20, Math.random() * 80 - 40],
+    }))
+  )
+
   return (
     <div className="relative w-full h-full flex items-center justify-center">
       <div className="relative w-40 h-40">
@@ -481,14 +508,14 @@ function NeuralCubeVisualizer() {
         </motion.div>
 
         {/* Neural Particles */}
-        {[...Array(6)].map((_, i) => (
+        {particles.map((p, i) => (
           <motion.div
             key={i}
             animate={{
               opacity: [0, 1, 0],
               scale: [0, 1.5, 0],
-              x: [Math.random() * 40 - 20, Math.random() * 80 - 40],
-              y: [Math.random() * 40 - 20, Math.random() * 80 - 40]
+              x: p.x,
+              y: p.y
             }}
             transition={{ duration: 3 + i, repeat: Infinity, delay: i * 0.5 }}
             className="absolute top-1/2 left-1/2 w-1 h-1 bg-purple-400 rounded-full"
@@ -595,6 +622,14 @@ function UniversalVaultVisual() {
     { icon: <ShieldCheck className="w-5 h-5" />, color: "text-red-400", delay: 3.5 },
   ];
 
+  const [particles] = useState(() =>
+    [...Array(12)].map(() => ({
+      x: [Math.random() * 400 - 200, Math.random() * 400 - 200],
+      duration: 5 + Math.random() * 5,
+      delay: Math.random() * 5,
+    }))
+  )
+
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
       {/* Dynamic Background Atmosphere */}
@@ -664,18 +699,18 @@ function UniversalVaultVisual() {
       </div>
 
       {/* Digital Particles */}
-      {[...Array(12)].map((_, i) => (
+      {particles.map((p, i) => (
         <motion.div
           key={i}
           animate={{
             y: [-100, 100],
             opacity: [0, 1, 0],
-            x: [Math.random() * 400 - 200, Math.random() * 400 - 200]
+            x: p.x
           }}
           transition={{
-            duration: 5 + Math.random() * 5,
+            duration: p.duration,
             repeat: Infinity,
-            delay: Math.random() * 5
+            delay: p.delay
           }}
           className="absolute w-1 h-1 bg-purple-400/20 rounded-full blur-[1px]"
         />
@@ -802,7 +837,7 @@ function PrivacyLock() {
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
           className="w-28 h-28 rounded-[3rem] bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shadow-2xl shadow-purple-500/50 backdrop-blur-md"
         >
-          <ShieldCheck className="w-14 h-14 text-purple-400 shadow-pulse" />
+          <ShieldCheck className="w-14 h-14 text-purple-400" />
         </motion.div>
         <div className="absolute -inset-12 bg-purple-500/5 rounded-full blur-[80px] -z-10" />
       </div>
@@ -813,7 +848,7 @@ function PrivacyLock() {
             <motion.div
               animate={{ x: [0, 24, 24, 0] }}
               transition={{ duration: 4, repeat: Infinity, times: [0, 0.4, 0.6, 1] }}
-              className="absolute left-1.5 top-1.5 w-3 h-3 rounded-full bg-white shadow-glow"
+              className="absolute left-1.5 top-1.5 w-3 h-3 rounded-full bg-white"
             />
           </div>
         </div>
