@@ -3,7 +3,7 @@ export type Theme = "light" | "dark"
 export const DEFAULT_THEME: Theme = "dark"
 export const DEFAULT_THEME_KEY = "vaultix-default-theme"
 export const SESSION_THEME_KEY = "vaultix-session-theme"
-const LEGACY_THEME_KEY = "vaultix-theme"
+export const LEGACY_THEME_KEY = "vaultix-theme"
 
 export function isTheme(value: unknown): value is Theme {
   return value === "light" || value === "dark"

@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "./ThemeContext";
+import {
+  DEFAULT_THEME_KEY,
+  LEGACY_THEME_KEY,
+  SESSION_THEME_KEY,
+} from "@/lib/themePreferences";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +15,6 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/vaultix-icon.png", type: "image/png" },
-      { url: "/vaultix-icon.svg", type: "image/svg+xml" },
     ],
     apple: "/vaultix-icon.png",
   },
@@ -29,9 +33,9 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  const sessionTheme = sessionStorage.getItem('vaultix-session-theme');
-                  const storedDefaultTheme = localStorage.getItem('vaultix-default-theme');
-                  const legacyTheme = localStorage.getItem('vaultix-theme');
+                  const sessionTheme = sessionStorage.getItem('${SESSION_THEME_KEY}');
+                  const storedDefaultTheme = localStorage.getItem('${DEFAULT_THEME_KEY}');
+                  const legacyTheme = localStorage.getItem('${LEGACY_THEME_KEY}');
                   const defaultTheme = storedDefaultTheme === 'light' || storedDefaultTheme === 'dark'
                     ? storedDefaultTheme
                     : legacyTheme === 'light' || legacyTheme === 'dark'
@@ -40,8 +44,8 @@ export default function RootLayout({
                   const theme = sessionTheme === 'light' || sessionTheme === 'dark' ? sessionTheme : defaultTheme;
 
                   if (legacyTheme === 'light' || legacyTheme === 'dark') {
-                    localStorage.setItem('vaultix-default-theme', legacyTheme);
-                    localStorage.removeItem('vaultix-theme');
+                    localStorage.setItem('${DEFAULT_THEME_KEY}', legacyTheme);
+                    localStorage.removeItem('${LEGACY_THEME_KEY}');
                   }
 
                   document.documentElement.dataset.theme = theme;
