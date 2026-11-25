@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code agent rules (kept local, not committed)
+/CLAUDE.md
+/.claude/
+# browser-check screenshots from test runs (may show test-account data)
+/docs/superpowers/plans/ui-baseline/
+# raw schema export from Supabase (user counts, metadata keys)
+/docs/superpowers/audit/schema.json
