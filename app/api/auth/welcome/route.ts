@@ -8,6 +8,11 @@ import { getSupabaseAdmin } from "@/lib/server/supabaseAdmin"
 
 export const runtime = "nodejs"
 
+// user_metadata is user-editable, so a name can be any JSON value.
+function nameFrom(value: unknown) {
+  return typeof value === "string" ? value : ""
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getUserFromBearer(req)
@@ -15,9 +20,15 @@ export async function POST(req: NextRequest) {
       return jsonError(401, "Unauthorized")
     }
 
-    // Check if welcome email was already sent
-    if (user.user_metadata?.welcome_sent) {
+    // The flag lives in app_metadata (server-only). The old user_metadata flag still
+    // counts, so accounts welcomed before the move get no second mail.
+    if (user.app_metadata?.welcome_sent === true || user.user_metadata?.welcome_sent === true) {
       return NextResponse.json({ success: true, message: "Welcome email already sent" })
+    }
+
+    const userEmail = user.email
+    if (!userEmail) {
+      return NextResponse.json({ success: true, message: "Welcome email skipped" })
     }
 
     const welcomeLockKey = `welcome:${user.id}`
@@ -26,18 +37,35 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const userName = user.user_metadata?.full_name || user.user_metadata?.name || "there"
-      const userEmail = user.email!
+      const userName =
+        nameFrom(user.user_metadata?.full_name) || nameFrom(user.user_metadata?.name) || "there"
+      const admin = getSupabaseAdmin()
 
-      await sendWelcomeEmail({ email: userEmail, name: userName })
-
-      // Mark as sent in user metadata
-      const { error: updateError } = await getSupabaseAdmin().auth.admin.updateUserById(user.id, {
-        user_metadata: { ...user.user_metadata, welcome_sent: true }
+      // Set the flag before sending so a retry cannot send a second mail.
+      const { error: flagError } = await admin.auth.admin.updateUserById(user.id, {
+        app_metadata: { welcome_sent: true },
       })
 
-      if (updateError) {
-        console.error("Failed to update user metadata:", updateError)
+      if (flagError) {
+        console.error("Failed to save the welcome flag:", flagError)
+        return jsonError(500, "Internal server error")
+      }
+
+      try {
+        await sendWelcomeEmail({ email: userEmail, name: userName })
+      } catch (sendError) {
+        console.error("Welcome email failed:", sendError)
+
+        // Clear the flag (a null value removes the key) so the next sign-in retries.
+        const { error: clearError } = await admin.auth.admin.updateUserById(user.id, {
+          app_metadata: { welcome_sent: null },
+        })
+
+        if (clearError) {
+          console.error("Failed to clear the welcome flag:", clearError)
+        }
+
+        return jsonError(500, "Internal server error")
       }
 
       return NextResponse.json({ success: true, message: "Welcome email sent" })
