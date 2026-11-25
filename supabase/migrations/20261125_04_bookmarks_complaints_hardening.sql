@@ -27,7 +27,9 @@
 --
 -- Read the NOTICE lines in the editor's output: each one says what was done or
 -- skipped. A notice that says "ask the owner" means some rows were left as they are
--- and need a decision; this file never changes or removes them.
+-- and need a decision; this file never changes or removes them. The editor may not
+-- show notices, so the file ends with one read-only summary query: check its
+-- "actual" column against "expected".
 
 begin;
 
@@ -84,7 +86,11 @@ end $$;
 
 -- Part 2: bookmarks CHECK constraints (V-103, P5). Added only if absent; validated
 -- only when no row breaks them. A null priority passes the check (as it does today).
+-- A NOT VALID check is still enforced on every UPDATE of an existing row (whatever
+-- column changes), so a breaking row cannot be edited or archived until it is fixed.
 do $$
+declare
+  v_bad bigint;
 begin
   if not exists (select 1 from pg_constraint
                   where conrelid = 'public.bookmarks'::regclass and conname = 'bookmarks_priority_range') then
@@ -98,8 +104,9 @@ begin
   if exists (select 1 from pg_constraint
               where conrelid = 'public.bookmarks'::regclass
                 and conname = 'bookmarks_priority_range' and not convalidated) then
-    if exists (select 1 from public.bookmarks where priority not between 1 and 3) then
-      raise notice 'bookmarks has rows with priority outside 1 to 3: bookmarks_priority_range left NOT VALID (new rows are checked); ask the owner';
+    select count(*) into v_bad from public.bookmarks where priority not between 1 and 3;
+    if v_bad > 0 then
+      raise notice 'bookmarks has % row(s) with priority outside 1 to 3: bookmarks_priority_range left NOT VALID. New rows AND any update of those rows (even archiving) are refused until they are fixed; ask the owner', v_bad;
     else
       alter table public.bookmarks validate constraint bookmarks_priority_range;
       raise notice 'bookmarks: bookmarks_priority_range validated';
@@ -118,8 +125,9 @@ begin
   if exists (select 1 from pg_constraint
               where conrelid = 'public.bookmarks'::regclass
                 and conname = 'bookmarks_title_not_blank' and not convalidated) then
-    if exists (select 1 from public.bookmarks where length(btrim(title)) = 0) then
-      raise notice 'bookmarks has rows with a blank title: bookmarks_title_not_blank left NOT VALID (new rows are checked); ask the owner';
+    select count(*) into v_bad from public.bookmarks where length(btrim(title)) = 0;
+    if v_bad > 0 then
+      raise notice 'bookmarks has % row(s) with a blank title: bookmarks_title_not_blank left NOT VALID. New rows AND any update of those rows (even archiving) are refused until they are fixed; ask the owner', v_bad;
     else
       alter table public.bookmarks validate constraint bookmarks_title_not_blank;
       raise notice 'bookmarks: bookmarks_title_not_blank validated';
@@ -129,8 +137,11 @@ end $$;
 
 -- Part 3: complaints CHECK constraints and column-level INSERT grant (V-103, V-018, P7).
 -- complaints.created_at already has a NOT NULL default (timezone('utc', now())), so it
--- is not touched here (ruling C-10).
+-- is not touched here (ruling C-10). As in part 2, a NOT VALID check is also enforced
+-- on every UPDATE of an existing row.
 do $$
+declare
+  v_bad bigint;
 begin
   if not exists (select 1 from pg_constraint
                   where conrelid = 'public.complaints'::regclass and conname = 'complaints_subject_length') then
@@ -144,8 +155,9 @@ begin
   if exists (select 1 from pg_constraint
               where conrelid = 'public.complaints'::regclass
                 and conname = 'complaints_subject_length' and not convalidated) then
-    if exists (select 1 from public.complaints where char_length(subject) > 200) then
-      raise notice 'complaints has rows with a subject over 200 characters: complaints_subject_length left NOT VALID (new rows are checked); ask the owner';
+    select count(*) into v_bad from public.complaints where char_length(subject) > 200;
+    if v_bad > 0 then
+      raise notice 'complaints has % row(s) with a subject over 200 characters: complaints_subject_length left NOT VALID. New rows AND any update of those rows are refused until they are fixed; ask the owner', v_bad;
     else
       alter table public.complaints validate constraint complaints_subject_length;
       raise notice 'complaints: complaints_subject_length validated';
@@ -164,8 +176,9 @@ begin
   if exists (select 1 from pg_constraint
               where conrelid = 'public.complaints'::regclass
                 and conname = 'complaints_body_length' and not convalidated) then
-    if exists (select 1 from public.complaints where char_length(body) > 5000) then
-      raise notice 'complaints has rows with a body over 5000 characters: complaints_body_length left NOT VALID (new rows are checked); ask the owner';
+    select count(*) into v_bad from public.complaints where char_length(body) > 5000;
+    if v_bad > 0 then
+      raise notice 'complaints has % row(s) with a body over 5000 characters: complaints_body_length left NOT VALID. New rows AND any update of those rows are refused until they are fixed; ask the owner', v_bad;
     else
       alter table public.complaints validate constraint complaints_body_length;
       raise notice 'complaints: complaints_body_length validated';
@@ -215,25 +228,41 @@ begin
   select attnum into v_created from pg_attribute
    where attrelid = 'public.bookmarks'::regclass and attname = 'created_at';
 
+  -- Only a valid, non-partial index counts as equivalent.
   if exists (select 1 from pg_index
               where indrelid = 'public.bookmarks'::regclass
-                and indkey[0] = v_user and indkey[1] = v_created) then
-    raise notice 'bookmarks: an index on (user_id, created_at) already exists: not added';
+                and indkey[0] = v_user and indkey[1] = v_created
+                and indisvalid and indpred is null) then
+    raise notice 'bookmarks: a valid index on (user_id, created_at) already exists: not added';
   else
     create index if not exists bookmarks_user_id_created_at_idx
       on public.bookmarks (user_id, created_at desc);
-    raise notice 'bookmarks: index bookmarks_user_id_created_at_idx created';
+    if exists (select 1 from pg_index
+                where indexrelid = to_regclass('public.bookmarks_user_id_created_at_idx')
+                  and indrelid = 'public.bookmarks'::regclass
+                  and indkey[0] = v_user and indkey[1] = v_created) then
+      raise notice 'bookmarks: index bookmarks_user_id_created_at_idx is in place';
+    else
+      raise notice 'bookmarks: bookmarks_user_id_created_at_idx exists but not on (user_id, created_at); ask the owner';
+    end if;
   end if;
 
   select attnum into v_user from pg_attribute
    where attrelid = 'public.complaints'::regclass and attname = 'user_id';
 
   if exists (select 1 from pg_index
-              where indrelid = 'public.complaints'::regclass and indkey[0] = v_user) then
-    raise notice 'complaints: an index led by user_id already exists: not added';
+              where indrelid = 'public.complaints'::regclass and indkey[0] = v_user
+                and indisvalid and indpred is null) then
+    raise notice 'complaints: a valid index led by user_id already exists: not added';
   else
     create index if not exists complaints_user_id_idx on public.complaints (user_id);
-    raise notice 'complaints: index complaints_user_id_idx created';
+    if exists (select 1 from pg_index
+                where indexrelid = to_regclass('public.complaints_user_id_idx')
+                  and indrelid = 'public.complaints'::regclass and indkey[0] = v_user) then
+      raise notice 'complaints: index complaints_user_id_idx is in place';
+    else
+      raise notice 'complaints: complaints_user_id_idx exists but is not led by user_id; ask the owner';
+    end if;
   end if;
 end $$;
 
@@ -259,3 +288,64 @@ begin
 end $$;
 
 commit;
+
+-- Read-only summary. The SQL editor may hide NOTICE lines and shows only the last
+-- result set, so this one query reports everything that matters. Compare "actual"
+-- with "expected" on each row. A constraint row showing false means that check was
+-- left NOT VALID (rows break it): ask the owner. The privilege rows matter most: a
+-- REVOKE or GRANT run by a role that is not the grantor only warns and does nothing.
+select item, actual, expected
+  from (values
+    (1, 'bookmarks_priority_range validated',
+        coalesce((select convalidated::text from pg_catalog.pg_constraint
+                   where conrelid = 'public.bookmarks'::regclass and conname = 'bookmarks_priority_range'), 'missing'),
+        'true'),
+    (2, 'bookmarks_title_not_blank validated',
+        coalesce((select convalidated::text from pg_catalog.pg_constraint
+                   where conrelid = 'public.bookmarks'::regclass and conname = 'bookmarks_title_not_blank'), 'missing'),
+        'true'),
+    (3, 'complaints_subject_length validated',
+        coalesce((select convalidated::text from pg_catalog.pg_constraint
+                   where conrelid = 'public.complaints'::regclass and conname = 'complaints_subject_length'), 'missing'),
+        'true'),
+    (4, 'complaints_body_length validated',
+        coalesce((select convalidated::text from pg_catalog.pg_constraint
+                   where conrelid = 'public.complaints'::regclass and conname = 'complaints_body_length'), 'missing'),
+        'true'),
+    (5, 'bookmarks.created_at NOT NULL',
+        (select attnotnull::text from pg_catalog.pg_attribute
+          where attrelid = 'public.bookmarks'::regclass and attname = 'created_at'),
+        'true'),
+    (6, 'bookmarks indexes',
+        (select string_agg(indexname::text, ', ' order by indexname) from pg_catalog.pg_indexes
+          where schemaname = 'public' and tablename = 'bookmarks'),
+        'includes bookmarks_user_id_created_at_idx (or a notice named an equivalent)'),
+    (7, 'complaints indexes',
+        (select string_agg(indexname::text, ', ' order by indexname) from pg_catalog.pg_indexes
+          where schemaname = 'public' and tablename = 'complaints'),
+        'includes complaints_user_id_idx (or a notice named an equivalent)'),
+    (8, 'update_updated_at proconfig',
+        coalesce((select array_to_string(proconfig, ',') from pg_catalog.pg_proc
+                   where oid = to_regprocedure('public.update_updated_at()')), 'none'),
+        'search_path=""'),
+    (9, 'visit_count comment set',
+        (select (col_description('public.bookmarks'::regclass, attnum) is not null)::text
+           from pg_catalog.pg_attribute
+          where attrelid = 'public.bookmarks'::regclass and attname = 'visit_count'),
+        'true'),
+    (10, 'anon INSERT on complaints (table)',
+        has_table_privilege('anon', 'public.complaints', 'INSERT')::text, 'false'),
+    (11, 'anon INSERT on any complaints column',
+        has_any_column_privilege('anon', 'public.complaints', 'INSERT')::text, 'false'),
+    (12, 'authenticated INSERT on complaints (table)',
+        has_table_privilege('authenticated', 'public.complaints', 'INSERT')::text, 'false'),
+    (13, 'authenticated INSERT on complaints.status',
+        has_column_privilege('authenticated', 'public.complaints', 'status', 'INSERT')::text, 'false'),
+    (14, 'authenticated INSERT on complaints.user_email',
+        has_column_privilege('authenticated', 'public.complaints', 'user_email', 'INSERT')::text, 'false'),
+    (15, 'authenticated INSERT on complaints.subject',
+        has_column_privilege('authenticated', 'public.complaints', 'subject', 'INSERT')::text, 'true'),
+    (16, 'service_role INSERT on complaints (table)',
+        has_table_privilege('service_role', 'public.complaints', 'INSERT')::text, 'true')
+  ) as summary(n, item, actual, expected)
+ order by n;
