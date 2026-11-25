@@ -71,6 +71,7 @@ export default function LandingPage() {
   const [isAuthStarting, setIsAuthStarting] = useState(false);
   const [isCtaVisible, setIsCtaVisible] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [noticeShownCount, setNoticeShownCount] = useState(0);
   // false on the server and during hydration, so the server HTML has no video source
   const isClient = useSyncExternalStore(subscribeNoop, () => true, () => false);
   // Mirrors the `md:` breakpoint that switches between the two hero layouts
@@ -81,19 +82,21 @@ export default function LandingPage() {
   const isDesktopRef = useRef(isDesktop);
   const interactionHandledRef = useRef(false); // a touch and its click run the handler once
   const ctaShownRef = useRef(false); // prevents CTA trigger firing multiple times
-  const noticeTimerRef = useRef<number | null>(null);
 
+  // Each call starts the 4.2s dismiss timer again, even for the same message
   const showNotice = useCallback((message: string) => {
-    if (noticeTimerRef.current !== null) {
-      window.clearTimeout(noticeTimerRef.current);
+    setNotice(message);
+    setNoticeShownCount((count) => count + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!notice) {
+      return;
     }
 
-    setNotice(message);
-    noticeTimerRef.current = window.setTimeout(() => {
-      noticeTimerRef.current = null;
-      setNotice(null);
-    }, 4200);
-  }, []);
+    const timer = window.setTimeout(() => setNotice(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [notice, noticeShownCount]);
 
   // Web Audio API refs for smooth cross-platform volume fading
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -105,11 +108,24 @@ export default function LandingPage() {
     []
   );
 
-  // Only one video loads: when the layout switches, stop the one that is now hidden
+  // Only one video plays: when the layout switches, stop the one that is now hidden
+  // and resume the one that is visible again (re-inserting its <source> does not
+  // restart a video that already holds a resource, and pause() disarms autoplay).
   useEffect(() => {
     isDesktopRef.current = isDesktop;
     const hiddenVideo = isDesktop ? mobileVideoRef.current : desktopVideoRef.current;
     hiddenVideo?.pause();
+
+    const activeVideo = isDesktop ? desktopVideoRef.current : mobileVideoRef.current;
+    if (!activeVideo) {
+      return;
+    }
+    if (activeVideo.networkState === HTMLMediaElement.NETWORK_NO_SOURCE) {
+      // Its source was removed and the element holds nothing to play
+      activeVideo.load();
+    } else if (activeVideo.currentSrc && !activeVideo.ended) {
+      activeVideo.play().catch(() => { });
+    }
   }, [isDesktop]);
 
   // Autoplay (muted unless the visitor already interacted) once the video can play
@@ -144,10 +160,34 @@ export default function LandingPage() {
       }
     }, 12000);
 
+    const unmuteAndPlay = (video: HTMLVideoElement) => {
+      video.muted = false;
+      video.volume = 1;
+
+      // Play the video unconditionally, EXCEPT if we can definitively prove
+      // that it is at the very end of its track. This prevents late double-looping,
+      // but guarantees playback starts correctly even if duration hasn't registered yet.
+      if (!video.ended) {
+        if (video.duration && video.currentTime >= video.duration - 0.5) {
+          // Video is practically finished, don't restart it
+        } else {
+          video.play().catch(() => { });
+        }
+      }
+    };
+
     const handleInteraction = () => {
+      // The video the visitor can see. The hidden layout's video stays muted
+      // (its `muted` prop keeps it so) and has no source.
+      const activeVideo = getActiveVideo();
+
       if (interactionHandledRef.current) {
-        // A touch is followed by its click. The work is done, but a suspended
-        // AudioContext can only be resumed from a gesture browsers accept (the click).
+        // A touch is followed by its click. Some browsers (iOS WebKit) only accept
+        // unmuting, play() and AudioContext.resume() from the click, so retry them
+        // there if the touch could not do them.
+        if (activeVideo && (activeVideo.muted || activeVideo.paused)) {
+          unmuteAndPlay(activeVideo);
+        }
         if (audioCtxRef.current?.state === "suspended") {
           audioCtxRef.current.resume().catch(() => { });
         }
@@ -158,23 +198,9 @@ export default function LandingPage() {
       // Remove early return to ensure muted state resolves correctly
       setHasUserInteracted(true);
 
-      // Unmute and play the video the visitor can see. The hidden layout's video
-      // stays muted (its `muted` prop keeps it so) and has no source.
-      const activeVideo = getActiveVideo();
+      // Unmute and play the video the visitor can see
       if (activeVideo) {
-        activeVideo.muted = false;
-        activeVideo.volume = 1;
-
-        // Play the video unconditionally, EXCEPT if we can definitively prove
-        // that it is at the very end of its track. This prevents late double-looping,
-        // but guarantees playback starts correctly even if duration hasn't registered yet.
-        if (!activeVideo.ended) {
-          if (activeVideo.duration && activeVideo.currentTime >= activeVideo.duration - 0.5) {
-            // Video is practically finished, don't restart it
-          } else {
-            activeVideo.play().catch(() => { });
-          }
-        }
+        unmuteAndPlay(activeVideo);
       }
 
       // Web Audio API is ONLY used for the mobile video.
@@ -280,22 +306,12 @@ export default function LandingPage() {
         heroEl.removeEventListener("touchstart", handleInteraction);
       }
       listener.subscription.unsubscribe();
-      // Release the audio device; the next interaction builds a fresh context
+      // Release the audio device
       audioCtxRef.current?.close().catch(() => { });
       audioCtxRef.current = null;
       mobileGainRef.current = null;
     };
   }, [router, showNotice, getActiveVideo]);
-
-  // Drop a pending notice timer when the page unmounts
-  useEffect(() => {
-    return () => {
-      if (noticeTimerRef.current !== null) {
-        window.clearTimeout(noticeTimerRef.current);
-        noticeTimerRef.current = null;
-      }
-    };
-  }, []);
 
   // Smooth audio fade:
   // - Desktop: video.volume (Web Audio API is NOT used — it would break desktop audio)
@@ -309,8 +325,10 @@ export default function LandingPage() {
       // Only the visible video matters: the hidden one has no source
       const video = getActiveVideo();
 
-      // Once the video has ended there is nothing left to fade or watch
+      // Once the video has ended there is nothing left to fade or watch. Keep the
+      // loop alive (cheap) so a layout switch to a video that has not ended still works.
       if (video?.ended) {
+        rafId = requestAnimationFrame(tick);
         return;
       }
 
