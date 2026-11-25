@@ -12,6 +12,10 @@ export const runtime = "nodejs"
 const SKIP_DELETE_EMAIL_WEBHOOK_FLAG = "skip_account_deleted_email_webhook"
 const PAGE_SIZE = 1000
 const STORAGE_CHUNK_SIZE = 100
+// The reference check sends its names in a GET URL, so keep each filter well under the
+// ~8 KB request-line limit of common proxies.
+const REFERENCE_CHECK_MAX_NAMES = 20
+const REFERENCE_CHECK_MAX_FILTER_LENGTH = 3000
 const DELETION_FAILED = "Account deletion failed. Please try again."
 const PREPARE_FAILED = "Failed to prepare account deletion"
 
@@ -21,6 +25,42 @@ function chunk<T>(items: T[], size: number): T[][] {
     chunks.push(items.slice(index, index + size))
   }
   return chunks
+}
+
+// Object names only hold [A-Za-z0-9._-/] (getMediaPathFromUrl), so they cannot break
+// out of the quoted filter value. "_" is a LIKE wildcard, which can only over-match
+// and so only skip more.
+function referenceCondition(path: string) {
+  return `media_url.like."%${path}%"`
+}
+
+// Batches names for the reference check by count and by joined filter length.
+function referenceBatches(paths: string[]): string[][] {
+  const batches: string[][] = []
+  let current: string[] = []
+  let length = 0
+
+  for (const path of paths) {
+    // +1 for the comma that joins it to the previous condition.
+    const conditionLength = referenceCondition(path).length + 1
+    if (
+      current.length > 0 &&
+      (current.length >= REFERENCE_CHECK_MAX_NAMES ||
+        length + conditionLength > REFERENCE_CHECK_MAX_FILTER_LENGTH)
+    ) {
+      batches.push(current)
+      current = []
+      length = 0
+    }
+    length += conditionLength
+    current.push(path)
+  }
+
+  if (current.length > 0) {
+    batches.push(current)
+  }
+
+  return batches
 }
 
 // Supabase Auth merges app_metadata keys on update, and null removes the key (P20).
@@ -84,11 +124,8 @@ async function dropSharedMediaPaths(
   const removable: string[] = []
   let skipped = 0
 
-  for (const pathChunk of chunk(paths, STORAGE_CHUNK_SIZE)) {
-    // Object names only hold [A-Za-z0-9._-/] (getMediaPathFromUrl), so they cannot break
-    // out of the quoted filter value. "_" is a LIKE wildcard, which can only over-match
-    // and so only skip more.
-    const filter = pathChunk.map((path) => `media_url.like."%${path}%"`).join(",")
+  for (const pathChunk of referenceBatches(paths)) {
+    const filter = pathChunk.map(referenceCondition).join(",")
     const shared = new Set<string>()
     let checkFailed = false
 
@@ -208,7 +245,8 @@ export async function POST(req: NextRequest) {
 
       flaggedUserId = null
 
-      // The account is gone from here on: cleanup failures are logged, never returned.
+      // The account is gone from here on: each cleanup step logs its own failure, and
+      // none of them is returned or stops the next step.
       try {
         const { error: bookmarksError } = await supabaseAdmin
           .from("bookmarks")
@@ -218,9 +256,19 @@ export async function POST(req: NextRequest) {
         if (bookmarksError) {
           console.error("Bookmarks cleanup error (non-fatal):", bookmarksError)
         }
+      } catch (bookmarksError: unknown) {
+        console.error("Bookmarks cleanup error (non-fatal):", bookmarksError)
+      }
 
-        const removablePaths = await dropSharedMediaPaths(supabaseAdmin, userId, mediaPaths)
-        for (const pathChunk of chunk(removablePaths, STORAGE_CHUNK_SIZE)) {
+      let removablePaths: string[] = []
+      try {
+        removablePaths = await dropSharedMediaPaths(supabaseAdmin, userId, mediaPaths)
+      } catch (checkError: unknown) {
+        console.error("Shared media check failed, keeping all media objects:", checkError)
+      }
+
+      for (const pathChunk of chunk(removablePaths, STORAGE_CHUNK_SIZE)) {
+        try {
           const { error: storageError } = await supabaseAdmin.storage
             .from(MEDIA_BUCKET)
             .remove(pathChunk)
@@ -228,9 +276,9 @@ export async function POST(req: NextRequest) {
           if (storageError) {
             console.error("Storage cleanup error (non-fatal):", storageError)
           }
+        } catch (storageError: unknown) {
+          console.error("Storage cleanup error (non-fatal):", storageError)
         }
-      } catch (cleanupError: unknown) {
-        console.error("Post-deletion cleanup error (non-fatal):", cleanupError)
       }
 
       if (userEmail) {

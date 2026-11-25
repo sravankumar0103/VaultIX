@@ -22,6 +22,7 @@ const state = vi.hoisted(() => ({
   updateError: null as null | { message: string },
   deleteUserError: null as null | { message: string },
   removed: [] as string[][],
+  referenceFilters: [] as string[],
   emailed: [] as { email: string; name: string }[],
 }))
 
@@ -116,6 +117,7 @@ function serveRows(ownRows: Row[], otherRows: Row[] = []) {
     const page = (rows: Row[]) => (range ? rows.slice(range[0], range[1] + 1) : rows)
     if (methodArgs(chain, "neq")) {
       const filter = String(methodArgs(chain, "or")?.[0] ?? "")
+      state.referenceFilters.push(filter)
       const names = [...filter.matchAll(/%([^%]+)%/g)].map((match) => match[1])
       return {
         data: page(otherRows.filter((row) => names.some((name) => row.media_url?.includes(name)))),
@@ -139,6 +141,7 @@ beforeEach(() => {
   state.updateError = null
   state.deleteUserError = null
   state.removed = []
+  state.referenceFilters = []
   state.emailed = []
   vi.spyOn(console, "error").mockImplementation(() => {})
 })
@@ -261,6 +264,43 @@ describe("POST /api/delete-account", () => {
 
     expect(res.status).toBe(200)
     expect(state.removed.flat()).toEqual(["mine.pdf"])
+  })
+
+  it("keeps each reference-check filter short with many long object names", async () => {
+    // Same shape as buildMediaFileName output: 60-char slug, "-", 8-char id, ".pdf" (74 chars).
+    const names = Array.from(
+      { length: 85 },
+      (_, index) => `${"a-long-bookmark-title-for-a-realistic-upload-".padEnd(57, "x")}${String(index).padStart(4, "0")}-abcd1234.pdf`
+    )
+    expect(names[0]).toHaveLength(74)
+    const sharedName = names[40]
+    state.query = serveRows(
+      names.map((name) => ({ media_url: `${MEDIA}${name}` })),
+      [{ media_url: `${MEDIA}${sharedName}` }]
+    )
+
+    const res = await POST(request())
+
+    expect(res.status).toBe(200)
+    expect(state.referenceFilters.length).toBeGreaterThan(1)
+    expect(state.referenceFilters.every((filter) => filter.length < 3500)).toBe(true)
+    expect(new Set(state.removed.flat())).toEqual(new Set(names.filter((name) => name !== sharedName)))
+  })
+
+  it("still removes media when the bookmarks delete throws after the auth user is gone", async () => {
+    const serve = serveRows([{ media_url: `${MEDIA}mine.pdf` }])
+    state.query = (table, chain) => {
+      if (table === "bookmarks" && chain.some((step) => step.method === "delete")) {
+        throw new Error("network down")
+      }
+      return serve(table, chain)
+    }
+
+    const res = await POST(request())
+
+    expect(res.status).toBe(200)
+    expect(state.removed).toEqual([["mine.pdf"]])
+    expect(state.log).toContain("email")
   })
 
   it("removes nothing, but still succeeds, when the reference check fails", async () => {
