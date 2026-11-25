@@ -2,16 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { signOutGracefully } from "@/lib/authSession"
-import { clearSessionThemeOverride } from "@/lib/themePreferences"
+import { NAV_ITEMS, isActivePath } from "@/lib/navItems"
+import { useLogout } from "@/lib/useLogout"
 import LoadingLogo from "@/components/LoadingLogo"
-import { useState } from "react"
 import {
-  LayoutDashboard,
-  Star,
-  Folder,
-  Archive,
-  BarChart3,
   User,
   LogOut,
   ChevronLeft,
@@ -27,24 +21,7 @@ export default function Sidebar({
   setCollapsed: React.Dispatch<React.SetStateAction<boolean>>
 }) {
   const pathname = usePathname()
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
-
-  const navItems = [
-    { name: "All Bookmarks", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Priority", href: "/dashboard/priority", icon: Star },
-    { name: "Categories", href: "/dashboard/categories", icon: Folder },
-    { name: "Archived", href: "/dashboard/archived", icon: Archive },
-    { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  ]
-
-  const handleLogout = async () => {
-    if (isLoggingOut) return
-
-    setIsLoggingOut(true)
-    await signOutGracefully()
-    clearSessionThemeOverride()
-    window.location.href = "/"
-  }
+  const { logout, isLoggingOut } = useLogout()
 
   return (
     <>
@@ -80,6 +57,7 @@ export default function Sidebar({
 
         <button
           onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className="p-2 rounded-xl bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-themeMuted hover:text-themeText transition-all border border-transparent dark:border-white/5"
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -88,15 +66,15 @@ export default function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 flex flex-col gap-2 mt-4">
-        {navItems.map((item) => {
-          const isActive = item.href === "/dashboard"
-            ? pathname === "/dashboard"
-            : pathname === item.href || pathname.startsWith(item.href + "/")
+        {NAV_ITEMS.map((item) => {
+          const isActive = isActivePath(pathname, item.href)
 
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
+              aria-label={collapsed ? item.name : undefined}
               className={`
                 group flex items-center
                 ${collapsed ? "justify-center p-3" : "gap-3 px-4 py-3"}
@@ -132,6 +110,7 @@ export default function Sidebar({
 
         <Link
           href="/dashboard/account"
+          aria-label={collapsed ? "Account" : undefined}
           className={`
             flex items-center
             ${collapsed ? "justify-center p-3" : "gap-3 px-4 py-3"}
@@ -147,7 +126,8 @@ export default function Sidebar({
         </Link>
 
         <button
-          onClick={handleLogout}
+          onClick={logout}
+          aria-label={collapsed ? "Logout" : undefined}
           className={`
             w-full flex items-center
             ${collapsed ? "justify-center p-3" : "gap-3 px-4 py-3"}
