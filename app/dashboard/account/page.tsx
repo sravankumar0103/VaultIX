@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { DEFAULT_THEME, getStoredDefaultTheme, isTheme, type Theme } from "@/lib/themePreferences"
 import { clearLocalAuthSession, clearReturningUser, recoverFromAuthError } from "@/lib/authSession"
+import { useToast } from "@/lib/useToast"
 import {
     User as UserIcon,
     Mail,
@@ -49,14 +50,10 @@ export default function AccountPage() {
     // Complaint form
     const [complaintSubject, setComplaintSubject] = useState("")
     const [complaintBody, setComplaintBody] = useState("")
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
     // Toast
-    const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
-
-    const showToast = (message: string, type: "success" | "error") => {
-        setToast({ message, type })
-        setTimeout(() => setToast(null), 3500)
-    }
+    const { toast, showToast } = useToast(3500)
 
     useEffect(() => {
         const getUser = async () => {
@@ -89,12 +86,33 @@ export default function AccountPage() {
 
     const handleSave = async () => {
         if (!user) return
+
+        // A failed update must not look like a save: restore the fields from the saved profile.
+        let savedUser = user
+        const failUpdate = () => {
+            setDisplayName(savedUser.user_metadata?.full_name || savedUser.user_metadata?.name || "")
+            setEmail(savedUser.email || "")
+            setIsEditing(false)
+            showToast("Update failed", "error")
+        }
+
         try {
             if (displayName !== (user.user_metadata?.full_name || user.user_metadata?.name || "")) {
-                await supabase.auth.updateUser({ data: { full_name: displayName, name: displayName } })
+                const { data, error } = await supabase.auth.updateUser({ data: { full_name: displayName, name: displayName } })
+                if (error) {
+                    failUpdate()
+                    return
+                }
+                // Keep the saved profile current so a later failure restores the new name.
+                savedUser = data.user
+                setUser(data.user)
             }
             if (email !== user.email) {
-                await supabase.auth.updateUser({ email })
+                const { error } = await supabase.auth.updateUser({ email })
+                if (error) {
+                    failUpdate()
+                    return
+                }
                 showToast("Confirmation email sent to new address", "success")
                 setIsEditing(false)
                 return
@@ -102,7 +120,7 @@ export default function AccountPage() {
             showToast("Profile updated successfully", "success")
             setIsEditing(false)
         } catch {
-            showToast("Update failed", "error")
+            failUpdate()
         }
     }
 
@@ -159,33 +177,34 @@ export default function AccountPage() {
     }
 
     const handleComplaint = async () => {
+        if (isSubmitting) return
         if (!complaintSubject.trim() || !complaintBody.trim()) {
             showToast("Please fill in both subject and message", "error")
             return
         }
 
+        setIsSubmitting(true)
+
         try {
-            const { error } = await supabase.from("complaints").insert({
-                user_id: user?.id,
-                user_email: email,
-                subject: complaintSubject,
-                body: complaintBody,
-                status: "pending"
+            // The server stores the report and sends the email; it needs our session token.
+            const { data: sessionData } = await supabase.auth.getSession()
+            const token = sessionData?.session?.access_token
+            if (!token) { showToast("Not authenticated", "error"); return }
+
+            const res = await fetch("/api/send-email", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`,
+                },
+                body: JSON.stringify({ subject: complaintSubject, body: complaintBody }),
             })
 
-            if (error) throw error
-
-            // Trigger automated email alert
-            fetch("/api/send-email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    subject: complaintSubject,
-                    body: complaintBody,
-                    userEmail: email,
-                    userName: displayName
-                })
-            }).catch(e => console.error("Email notification failed:", e))
+            if (!res.ok) {
+                const data = await res.json().catch(() => null)
+                showToast(data?.error || "Failed to send report. Please try again.", "error")
+                return
+            }
 
             setComplaintSubject("")
             setComplaintBody("")
@@ -193,6 +212,8 @@ export default function AccountPage() {
         } catch (err) {
             console.error("Feedback error:", err)
             showToast("Failed to send report. Please try again.", "error")
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -348,6 +369,7 @@ export default function AccountPage() {
                         <input
                             value={complaintSubject}
                             onChange={(e) => setComplaintSubject(e.target.value)}
+                            maxLength={200}
                             className="w-full p-2.5 text-sm rounded-xl bg-themeSurface border border-white/10 text-themeText focus:ring-1 focus:ring-orange-500/50 focus:outline-none transition-all placeholder:text-themeMuted/50"
                             placeholder="e.g. Bookmarks not saving correctly"
                         />
@@ -357,6 +379,7 @@ export default function AccountPage() {
                         <textarea
                             value={complaintBody}
                             onChange={(e) => setComplaintBody(e.target.value)}
+                            maxLength={5000}
                             rows={3}
                             className="w-full p-2.5 text-sm rounded-xl bg-themeSurface border border-white/10 text-themeText focus:ring-1 focus:ring-orange-500/50 focus:outline-none transition-all placeholder:text-themeMuted/50 resize-none"
                             placeholder="Describe the issue..."
@@ -366,7 +389,8 @@ export default function AccountPage() {
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={handleComplaint}
-                        className="self-end flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium text-xs shadow-md shadow-orange-500/20 transition-colors"
+                        disabled={isSubmitting}
+                        className="self-end flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-xs shadow-md shadow-orange-500/20 transition-colors"
                     >
                         <Send size={12} />
                         Send Report
@@ -444,6 +468,7 @@ export default function AccountPage() {
             <AnimatePresence>
                 {toast && (
                         <motion.div
+                        role="status"
                         initial={{ opacity: 0, scale: 0.9, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: 20 }}
