@@ -1,9 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useRef,
+  useSyncExternalStore,
+  type SyntheticEvent,
+} from "react";
+import dynamic from "next/dynamic";
 import { supabase } from "@/lib/supabaseClient";
 import { Session } from "@supabase/supabase-js";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import LoadingLogo from "@/components/LoadingLogo";
 import { useRouter } from "next/navigation";
@@ -16,8 +24,44 @@ import {
   validateStoredReturningUser,
 } from "@/lib/authSession";
 import { clearSessionThemeOverride } from "@/lib/themePreferences";
-import { default as LandingFeatures } from "@/components/LandingFeatures";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import Footer from "@/components/Footer";
+
+// The features section is below the fold: load it in its own chunk and keep
+// its space reserved so the footer does not jump when it arrives.
+const LandingFeatures = dynamic(() => import("@/components/LandingFeatures"), {
+  loading: () => <div aria-hidden="true" className="min-h-screen w-full bg-[#030303]" />,
+});
+
+// Videos already routed through the Web Audio API (a video can only be connected once)
+const connectedVideos = new WeakMap<HTMLVideoElement, true>();
+
+type AudioWindow = Window & { webkitAudioContext?: typeof AudioContext };
+
+const subscribeNoop = () => () => { };
+
+// Connect a video element to the Web Audio API and return its GainNode,
+// or null when the video was connected earlier (the caller keeps that GainNode).
+function connectVideoToAudioContext(
+  ctx: AudioContext,
+  video: HTMLVideoElement
+): GainNode | null {
+  if (connectedVideos.has(video)) {
+    return null;
+  }
+  const source = ctx.createMediaElementSource(video);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(1, ctx.currentTime);
+  source.connect(gain);
+  gain.connect(ctx.destination);
+  connectedVideos.set(video, true);
+  return gain;
+}
+
+// Trim the initial 500ms to skip the blurry purple starter frame
+function handleVideoMetadata(event: SyntheticEvent<HTMLVideoElement>) {
+  event.currentTarget.currentTime = 0.5;
+}
 
 export default function LandingPage() {
   const router = useRouter();
@@ -27,10 +71,15 @@ export default function LandingPage() {
   const [isAuthStarting, setIsAuthStarting] = useState(false);
   const [isCtaVisible, setIsCtaVisible] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [videoKey] = useState(() => `${Date.now()}-${Math.random()}`);
+  // false on the server and during hydration, so the server HTML has no video source
+  const isClient = useSyncExternalStore(subscribeNoop, () => true, () => false);
+  // Mirrors the `md:` breakpoint that switches between the two hero layouts
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const heroRef = useRef<HTMLElement>(null);
   const desktopVideoRef = useRef<HTMLVideoElement | null>(null);
   const mobileVideoRef = useRef<HTMLVideoElement | null>(null);
+  const isDesktopRef = useRef(isDesktop);
+  const interactionHandledRef = useRef(false); // a touch and its click run the handler once
   const ctaShownRef = useRef(false); // prevents CTA trigger firing multiple times
   const noticeTimerRef = useRef<number | null>(null);
 
@@ -48,26 +97,38 @@ export default function LandingPage() {
 
   // Web Audio API refs for smooth cross-platform volume fading
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const desktopGainRef = useRef<GainNode | null>(null);
   const mobileGainRef = useRef<GainNode | null>(null);
 
-  // Connect a video element to the Web Audio API and return its GainNode
-  const connectVideoToAudioContext = (
-    ctx: AudioContext,
-    video: HTMLVideoElement
-  ): GainNode => {
-    // Each video can only be connected once — guard with a flag
-    if ((video as any).__audioConnected) {
-      return (video as any).__gainNode as GainNode;
-    }
-    const source = ctx.createMediaElementSource(video);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(1, ctx.currentTime);
-    source.connect(gain);
-    gain.connect(ctx.destination);
-    (video as any).__audioConnected = true;
-    (video as any).__gainNode = gain;
-    return gain;
+  // The video of the layout the visitor can see
+  const getActiveVideo = useCallback(
+    () => (isDesktopRef.current ? desktopVideoRef.current : mobileVideoRef.current),
+    []
+  );
+
+  // Only one video loads: when the layout switches, stop the one that is now hidden
+  useEffect(() => {
+    isDesktopRef.current = isDesktop;
+    const hiddenVideo = isDesktop ? mobileVideoRef.current : desktopVideoRef.current;
+    hiddenVideo?.pause();
+  }, [isDesktop]);
+
+  // Autoplay (muted unless the visitor already interacted) once the video can play
+  const onVideoReady = useCallback(
+    (event: SyntheticEvent<HTMLVideoElement>) => {
+      const videoElement = event.currentTarget;
+      if (!hasUserInteracted) {
+        videoElement.muted = true;
+      }
+      videoElement.play().catch(() => { });
+      setIsVideoLoaded(true);
+    },
+    [hasUserInteracted]
+  );
+
+  const onVideoError = useCallback(() => setIsVideoLoaded(true), []);
+
+  const onVideoTimeUpdate = (event: SyntheticEvent<HTMLVideoElement>) => {
+    if (event.currentTarget.currentTime > 0.1 && !isVideoLoaded) setIsVideoLoaded(true);
   };
 
   useEffect(() => {
@@ -84,27 +145,37 @@ export default function LandingPage() {
     }, 12000);
 
     const handleInteraction = () => {
+      if (interactionHandledRef.current) {
+        // A touch is followed by its click. The work is done, but a suspended
+        // AudioContext can only be resumed from a gesture browsers accept (the click).
+        if (audioCtxRef.current?.state === "suspended") {
+          audioCtxRef.current.resume().catch(() => { });
+        }
+        return;
+      }
+      interactionHandledRef.current = true;
+
       // Remove early return to ensure muted state resolves correctly
       setHasUserInteracted(true);
 
-      // Unmute and play both videos
-      [desktopVideoRef.current, mobileVideoRef.current].forEach((video) => {
-        if (video) {
-          video.muted = false;
-          video.volume = 1;
+      // Unmute and play the video the visitor can see. The hidden layout's video
+      // stays muted (its `muted` prop keeps it so) and has no source.
+      const activeVideo = getActiveVideo();
+      if (activeVideo) {
+        activeVideo.muted = false;
+        activeVideo.volume = 1;
 
-          // Play the video unconditionally, EXCEPT if we can definitively prove
-          // that it is at the very end of its track. This prevents late double-looping,
-          // but guarantees playback starts correctly even if duration hasn't registered yet.
-          if (!video.ended) {
-            if (video.duration && video.currentTime >= video.duration - 0.5) {
-              // Video is practically finished, don't restart it
-            } else {
-              video.play().catch(() => { });
-            }
+        // Play the video unconditionally, EXCEPT if we can definitively prove
+        // that it is at the very end of its track. This prevents late double-looping,
+        // but guarantees playback starts correctly even if duration hasn't registered yet.
+        if (!activeVideo.ended) {
+          if (activeVideo.duration && activeVideo.currentTime >= activeVideo.duration - 0.5) {
+            // Video is practically finished, don't restart it
+          } else {
+            activeVideo.play().catch(() => { });
           }
         }
-      });
+      }
 
       // Web Audio API is ONLY used for the mobile video.
       // Reason: createMediaElementSource() takes over ALL audio routing from the
@@ -120,22 +191,23 @@ export default function LandingPage() {
         if (!audioCtxRef.current) {
           const Ctor =
             window.AudioContext ||
-            (window as any).webkitAudioContext;
+            (window as AudioWindow).webkitAudioContext;
           if (Ctor) {
-            const ctx = new Ctor() as AudioContext;
+            const ctx = new Ctor();
             audioCtxRef.current = ctx;
             ctx.resume(); // Always resume — AudioContext starts suspended in many browsers
 
-            // IMPORTANT: Only connect the MOBILE video. Never connect desktop video
-            // because that would silently disable its volume control.
-            if (mobileVideoRef.current) {
+            // IMPORTANT: Only connect the MOBILE video, and only when it is the visible
+            // one. Never connect desktop video because that would silently disable its
+            // volume control.
+            if (!isDesktopRef.current && mobileVideoRef.current) {
               mobileGainRef.current = connectVideoToAudioContext(ctx, mobileVideoRef.current);
             }
           }
         } else if (audioCtxRef.current.state === "suspended") {
           audioCtxRef.current.resume();
         }
-      } catch (e) {
+      } catch {
         // Web Audio API unavailable — rAF + video.volume fallback handles the fade
       }
     };
@@ -159,12 +231,18 @@ export default function LandingPage() {
     const heroEl = heroRef.current;
     if (heroEl) {
       heroEl.addEventListener("click", handleInteraction, { once: true });
-      heroEl.addEventListener("touchstart", handleInteraction, { once: true }); // Adding touchstart for immediate mobile response
+      // Adding touchstart for immediate mobile response (passive: it never calls preventDefault)
+      heroEl.addEventListener("touchstart", handleInteraction, { once: true, passive: true });
     }
 
     window.addEventListener("pageshow", handlePageShow);
 
+    let cancelled = false;
     resolveValidatedSession().then((result) => {
+      if (cancelled) {
+        return;
+      }
+
       if (result.status === "deleted") {
         showPendingDeletedNotice();
         setSession(null);
@@ -193,6 +271,7 @@ export default function LandingPage() {
     );
 
     return () => {
+      cancelled = true;
       window.removeEventListener("pageshow", handlePageShow);
       clearTimeout(fallbackTimer);
       clearTimeout(ctaFallbackTimer);
@@ -201,8 +280,22 @@ export default function LandingPage() {
         heroEl.removeEventListener("touchstart", handleInteraction);
       }
       listener.subscription.unsubscribe();
+      // Release the audio device; the next interaction builds a fresh context
+      audioCtxRef.current?.close().catch(() => { });
+      audioCtxRef.current = null;
+      mobileGainRef.current = null;
     };
-  }, [router, showNotice]);
+  }, [router, showNotice, getActiveVideo]);
+
+  // Drop a pending notice timer when the page unmounts
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current !== null) {
+        window.clearTimeout(noticeTimerRef.current);
+        noticeTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Smooth audio fade:
   // - Desktop: video.volume (Web Audio API is NOT used — it would break desktop audio)
@@ -213,51 +306,52 @@ export default function LandingPage() {
     const FADE_DURATION = 2.5; // seconds before end to begin fading
 
     const tick = () => {
-      const ctx = audioCtxRef.current;
+      // Only the visible video matters: the hidden one has no source
+      const video = getActiveVideo();
 
-      // Desktop video: ALWAYS use video.volume (never GainNode — Web Audio not connected here)
-      const desktop = desktopVideoRef.current;
-      if (desktop && !desktop.paused && !desktop.muted && desktop.duration) {
-        const remaining = desktop.duration - desktop.currentTime;
-        if (remaining <= FADE_DURATION && remaining > 0) {
-          const normalized = Math.max(0, remaining / FADE_DURATION);
-          try { desktop.volume = normalized * normalized; } catch (_) { }
-        } else if (remaining > FADE_DURATION && desktop.volume !== 1) {
-          try { desktop.volume = 1; } catch (_) { }
-        }
+      // Once the video has ended there is nothing left to fade or watch
+      if (video?.ended) {
+        return;
       }
 
-      // Mobile video: use GainNode if available (set up after user tap on touch devices)
-      // Falls back to video.volume if Web Audio wasn't initialised
-      const mobile = mobileVideoRef.current;
-      const gain = mobileGainRef.current;
-      if (mobile && !mobile.paused && !mobile.muted && mobile.duration) {
-        const remaining = mobile.duration - mobile.currentTime;
-        if (remaining <= FADE_DURATION && remaining > 0) {
-          const normalized = Math.max(0, remaining / FADE_DURATION);
-          const targetVol = normalized * normalized;
-          if (gain && ctx) {
-            gain.gain.setTargetAtTime(targetVol, ctx.currentTime, 0.05);
-          } else {
-            try { mobile.volume = targetVol; } catch (_) { }
+      if (video && !video.paused && !video.muted && video.duration) {
+        const remaining = video.duration - video.currentTime;
+
+        if (isDesktopRef.current) {
+          // Desktop video: ALWAYS use video.volume (never GainNode — Web Audio not connected here)
+          if (remaining <= FADE_DURATION && remaining > 0) {
+            const normalized = Math.max(0, remaining / FADE_DURATION);
+            try { video.volume = normalized * normalized; } catch { }
+          } else if (remaining > FADE_DURATION && video.volume !== 1) {
+            try { video.volume = 1; } catch { }
           }
-        } else if (remaining > FADE_DURATION) {
-          if (gain && ctx) {
-            gain.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
-          } else if (mobile.volume !== 1) {
-            try { mobile.volume = 1; } catch (_) { }
+        } else {
+          // Mobile video: use GainNode if available (set up after user tap on touch devices)
+          // Falls back to video.volume if Web Audio wasn't initialised
+          const ctx = audioCtxRef.current;
+          const gain = mobileGainRef.current;
+          if (remaining <= FADE_DURATION && remaining > 0) {
+            const normalized = Math.max(0, remaining / FADE_DURATION);
+            const targetVol = normalized * normalized;
+            if (gain && ctx) {
+              gain.gain.setTargetAtTime(targetVol, ctx.currentTime, 0.05);
+            } else {
+              try { video.volume = targetVol; } catch { }
+            }
+          } else if (remaining > FADE_DURATION) {
+            if (gain && ctx) {
+              gain.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
+            } else if (video.volume !== 1) {
+              try { video.volume = 1; } catch { }
+            }
           }
         }
       }
 
       // CTA trigger: show the button when the video is ~1.5s from ending
       if (!ctaShownRef.current) {
-        // Accurately capture the active video layout branch to prevent iOS Safari from ghost-pausing the logic
-        const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-        const watchVideo = isMobile ? mobileVideoRef.current : desktopVideoRef.current;
-
-        if (watchVideo && watchVideo.duration && !watchVideo.paused) {
-          const remaining = watchVideo.duration - watchVideo.currentTime;
+        if (video && video.duration && !video.paused) {
+          const remaining = video.duration - video.currentTime;
           if (remaining <= 1.5) {
             ctaShownRef.current = true;
             setIsCtaVisible(true);
@@ -270,9 +364,9 @@ export default function LandingPage() {
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, []);
+  }, [getActiveVideo]);
 
-  const handleOpenVault = async () => {
+  const handleOpenVault = useCallback(async () => {
     if (session) {
       router.push("/dashboard");
       return;
@@ -301,9 +395,10 @@ export default function LandingPage() {
     }
 
     router.push("/auth");
-  };
+  }, [session, isAuthStarting, router, showNotice]);
 
   return (
+    <MotionConfig reducedMotion="user">
     <main className="relative min-h-screen w-full bg-[#030303] text-white overflow-x-hidden font-sans selection:bg-purple-500/30 flex flex-col items-center">
       <LoadingLogo loading={!isVideoLoaded || isAuthStarting} delayMs={0} />
 
@@ -312,37 +407,26 @@ export default function LandingPage() {
 
         {/* Cinematic Background Video (ex2) - Case 1 (Desktop) */}
         <div className="absolute inset-0 z-0 h-screen w-full hidden md:flex items-center justify-center overflow-hidden">
+          {/* The visible wordmark is in the video; this gives desktop its one heading */}
+          <h1 className="sr-only">VaultIX</h1>
           <div
             className="relative flex items-center justify-center transition-all duration-700 ease-in-out overflow-hidden"
             style={{ width: '100%', maxWidth: '70vw', maxHeight: '70vh', aspectRatio: '16/9' }}
           >
             <video
-              key={videoKey}
               ref={desktopVideoRef}
               autoPlay
               playsInline
               preload="auto"
-              muted={!hasUserInteracted}
-              onLoadedMetadata={(e) => {
-                // Trim the initial 500ms to skip the blurry purple starter frame
-                e.currentTarget.currentTime = 0.5;
-              }}
-              onError={() => setIsVideoLoaded(true)}
-              onTimeUpdate={(e) => {
-                if (e.currentTarget.currentTime > 0.1 && !isVideoLoaded) setIsVideoLoaded(true);
-              }}
-              onCanPlay={(event) => {
-                const videoElement = event.currentTarget;
-                if (!hasUserInteracted) {
-                  videoElement.muted = true;
-                }
-                videoElement.play().catch(() => { });
-                setIsVideoLoaded(true);
-              }}
+              muted={!hasUserInteracted || !isDesktop}
+              onLoadedMetadata={handleVideoMetadata}
+              onError={onVideoError}
+              onTimeUpdate={onVideoTimeUpdate}
+              onCanPlay={onVideoReady}
               className={`vaultix-landing-video absolute inset-0 w-full h-full object-cover scale-[1.02] contrast-[1.25] brightness-[0.85] saturate-[1.1] transition-opacity duration-1000 ${isVideoLoaded ? "opacity-100" : "opacity-0"
                 }`}
             >
-              <source src="/ex2.mp4" type="video/mp4" />
+              {isClient && isDesktop && <source src="/ex2.mp4" type="video/mp4" />}
             </video>
 
             {/* Seamless Edge Blends to #030303 background */}
@@ -413,32 +497,20 @@ export default function LandingPage() {
           {/* Video Block (Pinned to Top) */}
           <div className="relative w-full h-[50vh] overflow-hidden bg-black flex items-center">
             <video
-              key={`${videoKey}-mobile`}
               ref={mobileVideoRef}
               autoPlay
               playsInline
               preload="auto"
-              muted={!hasUserInteracted}
-              onLoadedMetadata={(e) => {
-                // Trim the initial 500ms to skip the blurry purple starter frame
-                e.currentTarget.currentTime = 0.5;
-              }}
-              onError={() => setIsVideoLoaded(true)}
-              onTimeUpdate={(e) => {
-                if (e.currentTarget.currentTime > 0.1 && !isVideoLoaded) setIsVideoLoaded(true);
-              }}
-              onCanPlay={(event) => {
-                const videoElement = event.currentTarget;
-                if (!hasUserInteracted) {
-                  videoElement.muted = true;
-                }
-                videoElement.play().catch(() => { });
-              }}
+              muted={!hasUserInteracted || isDesktop}
+              onLoadedMetadata={handleVideoMetadata}
+              onError={onVideoError}
+              onTimeUpdate={onVideoTimeUpdate}
+              onCanPlay={onVideoReady}
               style={{ objectPosition: '10% center' }}
               className={`vaultix-landing-video-mobile w-full h-full object-cover scale-[1.02] contrast-[1.25] brightness-[0.85] saturate-[1.1] transition-opacity duration-1000 ${isVideoLoaded ? "opacity-100" : "opacity-0"
                 }`}
             >
-              <source src="/ex2.mp4" type="video/mp4" />
+              {isClient && !isDesktop && <source src="/ex2.mp4" type="video/mp4" />}
             </video>
             {/* Seamless Edge Blends to #030303 background */}
             <div className="absolute inset-y-0 left-0 w-[20%] bg-gradient-to-r from-[#030303] via-[#030303]/60 to-transparent pointer-events-none" />
@@ -544,6 +616,7 @@ export default function LandingPage() {
       <AnimatePresence>
         {notice ? (
           <motion.div
+            role="status"
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
@@ -561,12 +634,11 @@ export default function LandingPage() {
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-50 bg-[#030303] flex items-center justify-center"
           >
-            <div className="flex flex-col items-center text-white">
-              <LoadingLogo loading={!isVideoLoaded} delayMs={250} inline />
-            </div>
+            <div className="flex flex-col items-center text-white" />
           </motion.div>
         )}
       </AnimatePresence>
     </main>
+    </MotionConfig>
   );
 }
