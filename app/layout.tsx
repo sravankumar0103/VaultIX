@@ -7,8 +7,6 @@ import {
   SESSION_THEME_KEY,
 } from "@/lib/themePreferences";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
   title: "VaultIX",
   description: "Private intelligent bookmark vault",

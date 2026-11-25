@@ -1,44 +1,70 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Session } from "@supabase/supabase-js";
 import { motion } from "framer-motion";
 import { AlertCircle, Mail, PencilLine, UserRound } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  clearLocalAuthSession,
-  clearReturningUser,
-  isDeletedAccountError,
+  clearAutoSignInAttempt,
+  hasAttemptedAutoSignIn,
   isReturningUser,
+  markAutoSignInAttempt,
   markReturningUser,
+  readOAuthError,
   recoverFromAuthError,
+  resolveValidatedSession,
   startGoogleSignIn,
   validateStoredReturningUser,
 } from "@/lib/authSession";
 import { clearSessionThemeOverride } from "@/lib/themePreferences";
 import LoadingLogo from "@/components/LoadingLogo";
 
-export default function AuthPage() {
+const SIGN_IN_INCOMPLETE_MESSAGE = "Google sign-in didn't complete. Please try again.";
+const SIGN_IN_START_FAILED_MESSAGE = "Couldn't start Google sign-in. Please try again.";
+
+// readOAuthError only reads error_description; a bare ?error= / #error= also counts as an OAuth error.
+function readAuthReturnError(search: string, hash: string) {
+  const description = readOAuthError(search, hash);
+  if (description) {
+    return description;
+  }
+
+  return (
+    new URLSearchParams(search).get("error") ||
+    new URLSearchParams(hash.replace(/^#/, "")).get("error") ||
+    null
+  );
+}
+
+function AuthPageContent() {
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthTransitioning, setIsAuthTransitioning] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [signInError, setSignInError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const isProfileStep = searchParams.get("profile") === "1";
 
   useEffect(() => {
-    const beginReturningUserLogin = async () => {
-      const isValidReturningUser = await validateStoredReturningUser();
-      if (!isValidReturningUser) {
-        return;
+    const handlePageShow = (event: PageTransitionEvent) => {
+      // Coming back from the Google page via bfcache keeps the old loader state.
+      if (event.persisted) {
+        setIsAuthTransitioning(false);
       }
-
-      setIsAuthTransitioning(true);
-      clearSessionThemeOverride();
-      await startGoogleSignIn(`${window.location.origin}/dashboard`);
     };
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Read the URL before any await: the Supabase client may rewrite it while it initialises.
+    const oauthError = readAuthReturnError(window.location.search, window.location.hash);
 
     const applySessionProfile = (activeSession: Session) => {
       const suggestedName =
@@ -50,59 +76,63 @@ export default function AuthPage() {
       setDisplayName((currentName) => currentName || suggestedName);
     };
 
-    supabase.auth.getSession().then(async ({ data, error }) => {
-      if (error) {
-        const recovered = await recoverFromAuthError(error.message);
-        if (recovered && isDeletedAccountError(error.message)) {
-          router.replace("/");
-          return;
-        }
-        if (!recovered) {
-          console.error("Failed to get session:", error);
-        }
-        setSession(null);
+    resolveValidatedSession().then(async (result) => {
+      if (result.status === "deleted") {
+        router.replace("/");
         return;
       }
 
-      setSession(data.session);
-      if (data.session) {
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError || !userData.user) {
-          const recovered = await recoverFromAuthError(userError?.message);
-          if (recovered && isDeletedAccountError(userError?.message)) {
-            router.replace("/");
-            return;
-          }
-          if (!recovered) {
-            await clearLocalAuthSession();
-          }
-          clearReturningUser();
-          setSession(null);
-          return;
-        }
-
-        markReturningUser(userData.user.id);
-        applySessionProfile(data.session);
+      if (result.status === "signed-in") {
+        clearAutoSignInAttempt();
+        setSession(result.session);
+        applySessionProfile(result.session);
         if (!isProfileStep) {
           router.replace("/dashboard");
         }
         return;
       }
 
-      if (isReturningUser()) {
-        await beginReturningUserLogin();
+      setSession(null);
+
+      if (oauthError) {
+        console.warn("Google sign-in returned an error:", oauthError);
+        setSignInError(SIGN_IN_INCOMPLETE_MESSAGE);
+        return;
+      }
+
+      if (!isReturningUser() || hasAttemptedAutoSignIn()) {
+        return;
+      }
+
+      // Marked before the first await so a second run of this effect cannot start a second sign-in.
+      markAutoSignInAttempt();
+      const isValidReturningUser = await validateStoredReturningUser();
+      if (!isValidReturningUser) {
+        clearAutoSignInAttempt();
+        return;
+      }
+
+      setIsAuthTransitioning(true);
+      clearSessionThemeOverride();
+      const { error } = await startGoogleSignIn(`${window.location.origin}/dashboard`);
+      if (error) {
+        setIsAuthTransitioning(false);
+        setSignInError(SIGN_IN_START_FAILED_MESSAGE);
       }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        if (session) {
-          markReturningUser(session.user.id);
-          applySessionProfile(session);
-          if (!isProfileStep) {
-            router.replace("/dashboard");
-          }
+      (event, nextSession) => {
+        if (event !== "SIGNED_IN" || !nextSession) {
+          return;
+        }
+
+        clearAutoSignInAttempt();
+        setSession(nextSession);
+        markReturningUser(nextSession.user.id);
+        applySessionProfile(nextSession);
+        if (!isProfileStep) {
+          router.replace("/dashboard");
         }
       }
     );
@@ -115,12 +145,18 @@ export default function AuthPage() {
   const handleLogin = async () => {
     setIsAuthTransitioning(true);
     setProfileError(null);
+    setSignInError(null);
     clearSessionThemeOverride();
-    await startGoogleSignIn(`${window.location.origin}/auth?profile=1`);
+    const { error } = await startGoogleSignIn(`${window.location.origin}/auth?profile=1`);
+    if (error) {
+      setIsAuthTransitioning(false);
+      setSignInError(SIGN_IN_START_FAILED_MESSAGE);
+    }
   };
 
-  const handleCreateAccount = async () => {
-    if (!session) {
+  const handleCreateAccount = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!session || isAuthTransitioning) {
       return;
     }
 
@@ -152,7 +188,7 @@ export default function AuthPage() {
       }
     }
 
-    router.push("/dashboard");
+    router.replace("/dashboard");
   };
 
   return (
@@ -221,15 +257,19 @@ export default function AuthPage() {
 
               <div className="w-full">
                 {session && isProfileStep ? (
-                  <div className="space-y-5 text-left">
+                  <form onSubmit={handleCreateAccount} className="space-y-5 text-left">
                     <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
+                      <label htmlFor="displayName" className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
                         <UserRound className="h-3.5 w-3.5" />
                         Display name
                       </label>
                       <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
                         <PencilLine className="h-4 w-4 shrink-0 text-purple-500" />
                         <input
+                          id="displayName"
+                          name="displayName"
+                          autoComplete="name"
+                          maxLength={80}
                           value={displayName}
                           onChange={(event) => setDisplayName(event.target.value)}
                           placeholder="Your name"
@@ -258,13 +298,20 @@ export default function AuthPage() {
                     <motion.button
                       whileHover={{ scale: 1.02, y: -2 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={handleCreateAccount}
+                      type="submit"
                       className="w-full rounded-xl bg-purple-500 py-3 text-sm font-bold text-white shadow-lg shadow-purple-500/20 transition-all hover:bg-purple-600 active:shadow-none"
                     >
                       Create account
                     </motion.button>
-                  </div>
+                  </form>
                 ) : (
+                  <>
+                  {signInError ? (
+                    <div className="mb-5 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-left text-sm text-rose-700 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-200">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{signInError}</span>
+                    </div>
+                  ) : null}
                   <motion.button
                     whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
@@ -294,6 +341,7 @@ export default function AuthPage() {
                     </span>
                     <div className="absolute inset-0 translate-x-[-100%] bg-gradient-to-r from-purple-500/0 via-purple-500/10 to-purple-500/0 transition-transform duration-700 group-hover:translate-x-[100%]" />
                   </motion.button>
+                  </>
                 )}
               </div>
             </div>
@@ -301,5 +349,13 @@ export default function AuthPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={<LoadingLogo loading delayMs={0} />}>
+      <AuthPageContent />
+    </Suspense>
   );
 }

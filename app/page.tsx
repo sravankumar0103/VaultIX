@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Session } from "@supabase/supabase-js";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,13 +8,10 @@ import { ArrowRight } from "lucide-react";
 import LoadingLogo from "@/components/LoadingLogo";
 import { useRouter } from "next/navigation";
 import {
-  clearLocalAuthSession,
-  clearReturningUser,
   consumeDeletedAccountNotice,
-  isDeletedAccountError,
   isReturningUser,
   markReturningUser,
-  recoverFromAuthError,
+  resolveValidatedSession,
   startGoogleSignIn,
   validateStoredReturningUser,
 } from "@/lib/authSession";
@@ -29,12 +26,25 @@ export default function LandingPage() {
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [isAuthStarting, setIsAuthStarting] = useState(false);
   const [isCtaVisible, setIsCtaVisible] = useState(false);
-  const [showDeletedAccountNotice, setShowDeletedAccountNotice] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [videoKey] = useState(() => `${Date.now()}-${Math.random()}`);
   const heroRef = useRef<HTMLElement>(null);
   const desktopVideoRef = useRef<HTMLVideoElement | null>(null);
   const mobileVideoRef = useRef<HTMLVideoElement | null>(null);
   const ctaShownRef = useRef(false); // prevents CTA trigger firing multiple times
+  const noticeTimerRef = useRef<number | null>(null);
+
+  const showNotice = useCallback((message: string) => {
+    if (noticeTimerRef.current !== null) {
+      window.clearTimeout(noticeTimerRef.current);
+    }
+
+    setNotice(message);
+    noticeTimerRef.current = window.setTimeout(() => {
+      noticeTimerRef.current = null;
+      setNotice(null);
+    }, 4200);
+  }, []);
 
   // Web Audio API refs for smooth cross-platform volume fading
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -135,10 +145,14 @@ export default function LandingPage() {
         return;
       }
 
-      setShowDeletedAccountNotice(true);
-      window.setTimeout(() => {
-        setShowDeletedAccountNotice(false);
-      }, 4200);
+      showNotice("Your account was deleted. Please create it again.");
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      // Coming back from the Google page via bfcache keeps the old loader state.
+      if (event.persisted) {
+        setIsAuthStarting(false);
+      }
     };
 
     showPendingDeletedNotice();
@@ -148,51 +162,38 @@ export default function LandingPage() {
       heroEl.addEventListener("touchstart", handleInteraction, { once: true }); // Adding touchstart for immediate mobile response
     }
 
-    supabase.auth.getSession().then(async ({ data, error }) => {
-      if (error) {
-        const recovered = await recoverFromAuthError(error.message);
-        if (recovered && isDeletedAccountError(error.message)) {
-          showPendingDeletedNotice();
-        }
-        if (!recovered) {
-          console.error("Failed to get landing session:", error);
-        }
+    window.addEventListener("pageshow", handlePageShow);
+
+    resolveValidatedSession().then((result) => {
+      if (result.status === "deleted") {
+        showPendingDeletedNotice();
         setSession(null);
         return;
       }
 
-      setSession(data.session);
-      if (data.session) {
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError || !userData.user) {
-          const recovered = await recoverFromAuthError(userError?.message);
-          if (recovered && isDeletedAccountError(userError?.message)) {
-            showPendingDeletedNotice();
-          }
-          if (!recovered) {
-            await clearLocalAuthSession();
-          }
-          clearReturningUser();
-          setSession(null);
-          return;
-        }
-
-        markReturningUser(userData.user.id);
+      if (result.status === "signed-in") {
+        setSession(result.session);
         router.replace("/dashboard");
+        return;
       }
+
+      setSession(null);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (event, nextSession) => {
-        setSession(nextSession);
-        if (nextSession) {
+        if (event === "SIGNED_IN" && nextSession) {
+          setSession(nextSession);
           markReturningUser(nextSession.user.id);
           router.replace("/dashboard");
+        } else if (event === "SIGNED_OUT") {
+          setSession(null);
         }
       }
     );
 
     return () => {
+      window.removeEventListener("pageshow", handlePageShow);
       clearTimeout(fallbackTimer);
       clearTimeout(ctaFallbackTimer);
       if (heroEl) {
@@ -201,7 +202,7 @@ export default function LandingPage() {
       }
       listener.subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, showNotice]);
 
   // Smooth audio fade:
   // - Desktop: video.volume (Web Audio API is NOT used — it would break desktop audio)
@@ -278,15 +279,24 @@ export default function LandingPage() {
     }
 
     if (isReturningUser()) {
-      const isValidReturningUser = await validateStoredReturningUser();
-      if (!isValidReturningUser) {
-        router.push("/auth");
+      if (isAuthStarting) {
         return;
       }
 
       setIsAuthStarting(true);
+      const isValidReturningUser = await validateStoredReturningUser();
+      if (!isValidReturningUser) {
+        setIsAuthStarting(false);
+        router.push("/auth");
+        return;
+      }
+
       clearSessionThemeOverride();
-      await startGoogleSignIn(`${window.location.origin}/dashboard`);
+      const { error } = await startGoogleSignIn(`${window.location.origin}/dashboard`);
+      if (error) {
+        setIsAuthStarting(false);
+        showNotice("Couldn't start Google sign-in. Please try again.");
+      }
       return;
     }
 
@@ -532,14 +542,14 @@ export default function LandingPage() {
       <Footer />
 
       <AnimatePresence>
-        {showDeletedAccountNotice ? (
+        {notice ? (
           <motion.div
             initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
             className="fixed left-1/2 top-6 z-[120] w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-white/10 bg-black/80 px-4 py-3 text-center text-sm font-medium text-white shadow-2xl backdrop-blur-xl"
           >
-            Your account was deleted. Please create it again.
+            {notice}
           </motion.div>
         ) : null}
       </AnimatePresence>
