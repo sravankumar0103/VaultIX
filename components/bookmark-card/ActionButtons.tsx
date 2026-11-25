@@ -23,6 +23,7 @@ export default function ActionButtons({
 }: ActionButtonsProps) {
   return (
     <motion.div
+      key={isMobile ? "m" : "d"}
       initial={isMobile ? { opacity: 0 } : false}
       whileInView={isMobile ? { opacity: 1 } : {}}
       viewport={{ amount: 0.1, margin: "-15% 0px -15% 0px" }}

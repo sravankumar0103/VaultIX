@@ -11,6 +11,7 @@ export default function ActionFooter(props: Props) {
 
   return (
     <motion.div
+      key={isMobile ? "m" : "d"}
       initial={isMobile ? { opacity: 0, y: 10 } : false}
       whileInView={isMobile ? { opacity: 1, y: 0 } : {}}
       viewport={{ amount: 0.1, margin: "-15% 0px -15% 0px" }}

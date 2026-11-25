@@ -12,6 +12,7 @@ type Props = {
 export default function PriorityStars({ priority, isMobile, className = "" }: Props) {
   return (
     <motion.div
+      key={isMobile ? "m" : "d"}
       initial={isMobile ? { opacity: 0 } : false}
       whileInView={isMobile ? { opacity: 1 } : {}}
       viewport={{ amount: 0.1, margin: "-10% 0px -10% 0px" }}
