@@ -9,19 +9,19 @@ contains a secret or a real address, and none is run by the app.
 | Order | File | What it does | Depends on |
 |---|---|---|---|
 | (history) | `20260101_baseline_live_schema.sql` | Documents the live schema as known on 26 Nov 2026. **Do not run it on production.** | none |
-| (history) | `20260401_send_deleted_account_email.sql` | Original admin-deletion trigger. Its body is replaced by C3. Kept only as history. | none |
-| C1 | `20261125_01_bookmarks_rls.sql` | Enables RLS on `bookmarks` and creates the four `bookmarks_*_own` policies (`(select auth.uid()) = user_id`) when they do not exist. Drops nothing. | none: apply **first** |
+| (history) | `20260401_send_deleted_account_email.sql` | Legacy file, now reduced to `create extension if not exists pg_net` (its function body, secret and host were removed). C3 replaces the function and trigger. | none |
+| C1 | `20261125_01_bookmarks_rls.sql` | Enables RLS on `bookmarks` and creates the four `bookmarks_*_own` policies (`(select auth.uid()) = user_id`) when they do not exist. Drops nothing. | none: apply **first**. Its final NOTICE lists any OTHER policies on `bookmarks`: a loose permissive policy still grants access and must be reviewed against the Gate A export and dropped by hand. Rows with a NULL `user_id` become visible only to the service role: run `select count(*) from public.bookmarks where user_id is null` first. Realtime DELETE events are not RLS-checked and carry only the primary key. |
 | C2 | `20261125_02_user_foreign_keys.sql` | `complaints.user_id` becomes `ON DELETE CASCADE`; `bookmarks.user_id` gets an FK to `auth.users` with cascade, default `auth.uid()` and `NOT NULL` (validated only when no row breaks it). | C1 |
 | C3 | `20261125_03_account_deleted_webhook_vault.sql` | Replaces `notify_vaultix_account_deleted()` and the trigger on `auth.users`: URL and secret are read from Vault, the trigger is `BEFORE DELETE`, and a failure never blocks a user deletion. | C2, **and** the two Vault secrets below must exist |
 | C4 | `20261125_04_bookmarks_complaints_hardening.sql` | `bookmarks.created_at` default and `NOT NULL`, CHECK constraints, indexes, `update_updated_at` search path, complaints grants. | Apply **only after the branch is deployed** (the old client inserted into `complaints` directly and that insert is refused afterwards) |
 
 Notes on the order:
 
-- Apply C3 right after C2. Between C2 and C3 do not delete users from the Supabase dashboard.
+- Apply C3 right after C2. Between C2 and C3 do not delete users from the Supabase dashboard: after C2 the cascade removes the bookmark rows before the old trigger could read their media paths.
 - Never apply C3 before the Vault secrets exist. Without them the trigger only logs a warning and
   no deletion mail is sent.
 - Apply C4 last, after the deploy.
-- Every file is idempotent and non-destructive. A NOTICE that says "ask the owner" means some rows
+- Every file is idempotent and deletes no rows. A NOTICE that says "ask the owner" means some rows
   were left as they are and need a decision.
 
 ## Vault setup (before C3)

@@ -2,9 +2,10 @@
 -- DO NOT RUN ON PRODUCTION. It exists to describe what the live project holds, so a
 -- fresh project can be compared against it. No secret and no real address appear here.
 --
--- Source: the owner's screenshots and SQL editor history (25 Nov 2026). The Gate A
--- export (docs/superpowers/audit/schema-export.sql) has not been supplied, so anything
--- not known is marked "UNKNOWN until the Gate A export" and is never guessed.
+-- Source: the owner's screenshots and SQL editor history (25 Nov 2026), as recorded in
+-- docs/superpowers/audit/DECISIONS.md section 2. The Gate A export
+-- (docs/superpowers/audit/schema-export.sql) has not been supplied, so anything not
+-- listed there is marked "UNKNOWN until the Gate A export" and is never guessed.
 --
 -- Written with "create ... if not exists" and guarded blocks, so running it on the live
 -- project would change nothing. The files 20261125_01..04 change the schema afterwards;
@@ -17,7 +18,7 @@ create extension if not exists pg_net with schema extensions;
 
 -- public.bookmarks (14 columns). The code mirrors it in types/bookmark.ts.
 create table if not exists public.bookmarks (
-  id uuid primary key default gen_random_uuid(), -- default UNKNOWN until the Gate A export
+  id uuid primary key,                           -- live default UNKNOWN until the Gate A export
   user_id uuid,                                  -- nullable, no FK live (see 20261125_02)
   url text,
   created_at timestamptz,                        -- nullable, no default live (see 20261125_04)
@@ -49,20 +50,9 @@ alter table public.complaints enable row level security;
 -- bookmarks RLS state and policies: UNKNOWN until the Gate A export
 -- (docs/superpowers/audit/schema-export.sql). See 20261125_01_bookmarks_rls.sql.
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_policies
-     where schemaname = 'public' and tablename = 'complaints'
-       and cmd = 'INSERT'
-  ) then
-    create policy complaints_insert_own on public.complaints
-      for insert with check (auth.uid() = user_id);
-  end if;
-  -- The live policy name is UNKNOWN until the Gate A export. It is the only policy:
-  -- no SELECT, UPDATE or DELETE policy exists on complaints.
-end
-$$;
+-- complaints has ONE policy: INSERT, with check (auth.uid() = user_id). Its NAME is UNKNOWN
+-- until the Gate A export, so nothing is created here. No SELECT, UPDATE or DELETE
+-- policy exists on complaints.
 
 -- Indexes: UNKNOWN until the Gate A export (20261125_04 adds the ones the app needs).
 
