@@ -17,12 +17,25 @@ const EXTENSIONS: Record<string, string> = {
   "application/pdf": "pdf",
 }
 
+const MEDIA_PATH_PATTERN = /^[A-Za-z0-9._-]{1,200}(\/[A-Za-z0-9._-]{1,200})?$/
+
 export function getMediaPathFromUrl(url: string | null | undefined): string | null {
   if (!url) return null
-  const idx = url.indexOf(MEDIA_PUBLIC_PREFIX)
-  if (idx === -1) return null
-  const path = url.slice(idx + MEDIA_PUBLIC_PREFIX.length)
-  return path ? path : null
+  let pathname: string
+  try {
+    pathname = new URL(url).pathname
+  } catch {
+    return null
+  }
+  if (!pathname.startsWith(MEDIA_PUBLIC_PREFIX)) return null
+  let path: string
+  try {
+    path = decodeURIComponent(pathname.slice(MEDIA_PUBLIC_PREFIX.length))
+  } catch {
+    return null
+  }
+  if (!path || path.includes("..") || path.includes("?") || path.includes("#")) return null
+  return MEDIA_PATH_PATTERN.test(path) ? path : null
 }
 
 export function validateMediaFile(file: FileLike): { ok: true; ext: string } | { ok: false; message: string } {
@@ -41,6 +54,8 @@ export function buildMediaFileName(title: string, ext: string, randomId?: string
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/g, "")
   const id = randomId ?? crypto.randomUUID().replace(/-/g, "").slice(0, 8)
   return `${slug || "file"}-${id}.${ext}`
 }

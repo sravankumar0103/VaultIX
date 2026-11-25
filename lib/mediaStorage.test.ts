@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { MEDIA_MAX_BYTES, buildMediaFileName, getMediaPathFromUrl, validateMediaFile } from "@/lib/mediaStorage"
 
+const B = "https://x.supabase.co/storage/v1/object/public/media/"
 const f = (name: string, type: string, size = 1024 * 1024) => ({ name, type, size })
 
 describe("getMediaPathFromUrl", () => {
@@ -11,6 +12,21 @@ describe("getMediaPathFromUrl", () => {
     expect(getMediaPathFromUrl(null)).toBeNull()
     expect(getMediaPathFromUrl(undefined)).toBeNull()
   })
+  it("strips the query string and fragment", () => {
+    expect(getMediaPathFromUrl(`${B}a.pdf?t=1`)).toBe("a.pdf")
+    expect(getMediaPathFromUrl(`${B}a.pdf#x`)).toBe("a.pdf")
+  })
+  it("rejects traversal, a prefix only in the query, another bucket and bad encoding", () => {
+    expect(getMediaPathFromUrl(`${B}../other/x`)).toBeNull()
+    expect(getMediaPathFromUrl(`${B}%2e%2e/x`)).toBeNull()
+    expect(getMediaPathFromUrl("https://example.com/a?u=/storage/v1/object/public/media/a.pdf")).toBeNull()
+    expect(getMediaPathFromUrl("https://x.supabase.co/storage/v1/object/public/other/a.pdf")).toBeNull()
+    expect(getMediaPathFromUrl(`${B}%E0%A4%A.pdf`)).toBeNull()
+    expect(getMediaPathFromUrl(`${B}a/b/c.png`)).toBeNull()
+  })
+  it("accepts one folder level", () => {
+    expect(getMediaPathFromUrl(`${B}u1/a.png`)).toBe("u1/a.png")
+  })
 })
 
 describe("buildMediaFileName", () => {
@@ -19,6 +35,11 @@ describe("buildMediaFileName", () => {
   })
   it("falls back to file when the title has no usable characters", () => {
     expect(buildMediaFileName("!!!", "png", "ab12cd34")).toBe("file-ab12cd34.png")
+  })
+  it("caps the slug at 60 characters", () => {
+    const name = buildMediaFileName("a".repeat(300), "png", "ab12cd34")
+    expect(name).toBe(`${"a".repeat(60)}-ab12cd34.png`)
+    expect(buildMediaFileName(`${"a".repeat(59)} b`, "png", "ab12cd34")).toBe(`${"a".repeat(59)}-ab12cd34.png`)
   })
   it("generates an 8 character id by default", () => {
     expect(buildMediaFileName("a", "png")).toMatch(/^a-[0-9a-f]{8}\.png$/)
@@ -36,6 +57,10 @@ describe("validateMediaFile", () => {
   })
   it("falls back to bin", () => {
     expect(validateMediaFile(f("noext", "image/x-weird"))).toEqual({ ok: true, ext: "bin" })
+  })
+  it("falls back to bin for a long or non-alphanumeric extension", () => {
+    expect(validateMediaFile(f("a.abcdefg", "image/x-weird"))).toEqual({ ok: true, ext: "bin" })
+    expect(validateMediaFile(f("a.a-b", "image/x-weird"))).toEqual({ ok: true, ext: "bin" })
   })
   it("refuses other types", () => {
     expect(validateMediaFile(f("a.exe", "application/x-msdownload"))).toEqual({
