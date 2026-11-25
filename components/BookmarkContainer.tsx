@@ -1,37 +1,31 @@
 "use client"
 
-import { useEffect, useState, Suspense, useRef } from "react"
-import { useSearchParams } from "next/navigation"
+import { useEffect, useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { runIX } from "@/lib/ixEngine"
 import BookmarkCard from "@/components/BookmarkCard"
 import type { Bookmark } from "@/types/bookmark"
 import type { User } from "@supabase/supabase-js"
 import Toast from "@/components/Toast"
-import { useRouter } from "next/navigation"
-import {
-  Clock,
-  ArrowUp,
-  ArrowDown,
-  AArrowUp,
-  AArrowDown,
-  LayoutGrid,
-  List,
-  Eye,
-  AlignJustify,
-  LayoutDashboard,
-  Sun,
-  Moon,
-  ArrowUpDown,
-  Plus,
-  Search,
-  Settings2,
-  Folder
-} from "lucide-react"
+import { Folder } from "lucide-react"
 import { useTheme } from "@/app/ThemeContext"
 import { motion, AnimatePresence } from "framer-motion"
 import LoadingLogo from "@/components/LoadingLogo"
 import { isDeletedAccountError, recoverFromAuthError } from "@/lib/authSession"
+import BookmarkToolbar from "@/components/bookmarks/BookmarkToolbar"
+import BookmarkSubFilters from "@/components/bookmarks/BookmarkSubFilters"
+import BookmarkFormModal, {
+  type BookmarkFormValues,
+} from "@/components/bookmarks/BookmarkFormModal"
+import DeleteConfirmModal from "@/components/bookmarks/DeleteConfirmModal"
+
+const EMPTY_FORM: BookmarkFormValues = {
+  title: "",
+  url: "",
+  description: "",
+  priority: "Auto",
+}
 
 export default function BookmarkContainer({
   mode = "all",
@@ -45,15 +39,9 @@ export default function BookmarkContainer({
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const [title, setTitle] = useState("")
-  const [url, setUrl] = useState("")
-  const [description, setDescription] = useState("")
-  const [mediaFile, setMediaFile] = useState<File | null>(null)
-
   const [search, setSearch] = useState("")
   const [priorityFilter, setPriorityFilter] = useState<"All" | 1 | 2 | 3>("All")
   const [categoryFilter, setCategoryFilter] = useState("All")
-  const [manualPriority, setManualPriority] = useState<"Auto" | 1 | 2 | 3>("Auto")
 
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null)
 
@@ -61,11 +49,6 @@ export default function BookmarkContainer({
     id: string
     title: string
   } | null>(null)
-
-  const [editTitle, setEditTitle] = useState("")
-  const [editUrl, setEditUrl] = useState("")
-  const [editDescription, setEditDescription] = useState("")
-  const [editPriority, setEditPriority] = useState<1 | 2 | 3 | "Auto" | "">("")
 
   const [isAddOpen, setIsAddOpen] = useState(false)
 
@@ -88,11 +71,6 @@ export default function BookmarkContainer({
     "date-desc" | "date-asc" | "name-asc" | "name-desc"
   >("date-desc")
 
-  const [isViewOpen, setIsViewOpen] = useState(false)
-  const [isSortOpen, setIsSortOpen] = useState(false)
-
-  const viewRef = useRef<HTMLDivElement | null>(null)
-  const sortRef = useRef<HTMLDivElement | null>(null)
   const router = useRouter()
 
   const { theme, toggleTheme, setTheme } = useTheme()
@@ -243,22 +221,6 @@ export default function BookmarkContainer({
   }
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node
-      if (viewRef.current && !viewRef.current.contains(target)) {
-        setIsViewOpen(false)
-      }
-      if (sortRef.current && !sortRef.current.contains(target)) {
-        setIsSortOpen(false)
-      }
-    }
-    document.addEventListener("click", handleClickOutside)
-    return () => {
-      document.removeEventListener("click", handleClickOutside)
-    }
-  }, [])
-
-  useEffect(() => {
     const savedSort = localStorage.getItem("vaultix-sort-mode")
     if (savedSort && !user?.user_metadata?.sort_preference) {
       setSortBy(savedSort as any)
@@ -282,23 +244,17 @@ export default function BookmarkContainer({
   /* =========================
      Actions
   ========================= */
-   const addBookmark = async () => {
-    if (!title || (!url && !mediaFile) || !user) return
+   const addBookmark = async (values: BookmarkFormValues, mediaFile: File | null) => {
+    if (!values.title || (!values.url && !mediaFile) || !user) return
 
-    // Capture current values for reset and optimistic update
     const bookmarkData = {
-      title,
-      url,
-      description,
-      manualPriority
+      title: values.title,
+      url: values.url,
+      description: values.description,
+      manualPriority: values.priority
     }
 
-    // 1. Reset UI Immediately (Snappiness)
-    setTitle("")
-    setUrl("")
-    setDescription("")
-    setManualPriority("Auto")
-    setMediaFile(null)
+    // 1. Close the form immediately (Snappiness); it unmounts with its own state
     setIsAddOpen(false)
 
     // 2. Optimistic Update
@@ -449,29 +405,29 @@ export default function BookmarkContainer({
     }
   }
 
-  const updateBookmark = async () => {
+  const updateBookmark = async (values: BookmarkFormValues, mediaFile: File | null) => {
     if (!editingBookmark) return
-    
+
     const originalBookmark = { ...editingBookmark }
-    const ix = runIX(editUrl, editTitle)
-    
+    const ix = runIX(values.url, values.title)
+
     const isMedia = !!mediaFile || !!editingBookmark.media_url
-    const category = isMedia ? (editUrl ? "Media+URL" : "Media") : "URL"
+    const category = isMedia ? (values.url ? "Media+URL" : "Media") : "URL"
 
     const updatedData = {
-      title: editTitle,
-      url: editUrl,
-      description: editDescription,
+      title: values.title,
+      url: values.url,
+      description: values.description,
       domain: ix.domain,
       category: category,
       priority: (() => {
-        if (editPriority === "Auto" || editPriority === "") {
+        if (values.priority === "Auto") {
           const importance = ix.importance as string
           if (importance === "Critical" || importance === "High") return 3
           if (importance === "Medium") return 2
           return 1
         }
-        return Number(editPriority)
+        return Number(values.priority)
       })(),
       tags: ix.tags,
     }
@@ -502,7 +458,7 @@ export default function BookmarkContainer({
 
         // Upload new one
         const ext = mediaFile.name.split(".").pop() || "bin"
-        const slug = editTitle.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "").slice(0, 60)
+        const slug = values.title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9\-]/g, "").slice(0, 60)
         const randomId = Math.random().toString(36).substring(2, 6)
         const fileName = `${slug}-${randomId}.${ext}`
 
@@ -522,8 +478,7 @@ export default function BookmarkContainer({
         .eq("id", bookmarkId)
 
       if (error) throw error
-      
-      setMediaFile(null) // Clean up
+
       showToast("Bookmark updated", "success")
     } catch (err) {
       console.error("Update failed:", err)
@@ -587,7 +542,6 @@ export default function BookmarkContainer({
         return "Priority Items"
       case "archived": return "Archive"
       case "categories": return "Categories"
-      case "analytics": return "Insights"
       default: return "All Bookmarks"
     }
   }
@@ -598,176 +552,27 @@ export default function BookmarkContainer({
   return (
     <div className="w-full max-w-7xl mx-auto flex flex-col gap-6 md:gap-8 pb-10">
 
-      {/* ===== HEADER SECTION ===== */}
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between pt-4">
-        <div className="max-w-[calc(100vw-48px)]">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col">
-            <h2 className="text-sm md:text-lg font-medium text-themeMuted mb-1 truncate">
-              Hey, {user?.user_metadata?.full_name || user?.user_metadata?.name || "Sravan Kumar"}.
-            </h2>
-            <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-themeText mb-2">
-              {getHeaderTitle()}
-            </h1>
-          </motion.div>
-        </div>
+      <BookmarkToolbar
+        headerTitle={getHeaderTitle()}
+        user={user}
+        search={search}
+        onSearchChange={setSearch}
+        sortBy={sortBy}
+        onSortChange={updateSortBy}
+        viewMode={viewMode}
+        onViewModeChange={updateViewMode}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onNewBookmark={() => setIsAddOpen(true)}
+      />
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setIsAddOpen(true)}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-purple-500 hover:bg-purple-600 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow-lg shadow-purple-500/25 border border-purple-400/20"
-          >
-            <Plus size={18} />
-            <span>New Bookmark</span>
-          </motion.button>
-        </div>
-      </div>
-
-      {/* ===== CONTROLS ROW ===== */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between p-2 rounded-2xl glass mb-4 relative z-20">
-
-        {/* Search */}
-        <div className="relative w-full sm:w-96 group">
-          <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-themeMuted group-focus-within:text-purple-500 transition-colors">
-            <Search size={18} />
-          </div>
-          <input
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-themeCard border border-white/10 text-themeText placeholder:text-themeMuted/70 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300"
-            placeholder="Search by title, domain, tags..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-
-        {/* View & Sort */}
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-y-visible pb-1 sm:pb-0 justify-center sm:justify-start">
-          <div ref={sortRef} className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setIsSortOpen(!isSortOpen); }}
-              className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-themeText text-sm flex items-center gap-2 transition-all active:scale-95"
-            >
-              <ArrowUpDown size={16} className="text-themeMuted" />
-              <span>Sort</span>
-            </button>
-
-            {isSortOpen && (
-              <div className="absolute left-0 top-full mt-2 w-48 bg-themeCard border border-white/10 rounded-xl shadow-2xl p-1.5 z-[100]">
-                {[
-                  { id: "date-desc", label: "Newest first" },
-                  { id: "date-asc", label: "Oldest first" },
-                  { id: "name-asc", label: "Name (A-Z)" },
-                  { id: "name-desc", label: "Name (Z-A)" },
-                ].map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => { updateSortBy(s.id as any); setIsSortOpen(false) }}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${sortBy === s.id ? 'bg-purple-500/10 text-purple-500 font-medium' : 'text-themeText hover:bg-white/10'}`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div ref={viewRef} className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setIsViewOpen(!isViewOpen); }}
-              className="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-themeText text-sm flex items-center gap-2 transition-all active:scale-95"
-            >
-              <Settings2 size={16} className="text-themeMuted" />
-              <span>View</span>
-            </button>
-
-            {isViewOpen && (
-              <div className="absolute right-0 sm:left-0 top-full mt-2 w-48 bg-themeCard border border-white/10 rounded-xl shadow-2xl p-1.5 z-[100]">
-                {[
-                  { id: "cards", icon: LayoutGrid, label: "Cards" },
-                  { id: "list", icon: List, label: "Detailed List" },
-                  { id: "headlines", icon: AlignJustify, label: "Headlines" },
-                  { id: "moodboard", icon: LayoutDashboard, label: "Moodboard" }
-                ].map((v) => (
-                  <button
-                    key={v.id}
-                    onClick={() => { updateViewMode(v.id as any); setIsViewOpen(false) }}
-                    className={`flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${viewMode === v.id ? 'bg-purple-500/10 text-purple-500 font-medium' : 'text-themeText hover:bg-white/10'}`}
-                  >
-                    <v.icon size={16} className={viewMode === v.id ? "text-purple-500" : "text-themeMuted"} />
-                    {v.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="h-8 w-px bg-white/10 mx-1 hidden sm:block"></div>
-
-          <button
-            onClick={toggleTheme}
-            className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 flex items-center justify-center text-themeMuted hover:text-purple-500 transition-all active:scale-95"
-            title="Toggle Theme"
-          >
-            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-        </div>
-      </div>
-
-      {/* ===== PRIORITY SUB-FILTER ===== */}
-      {mode === "priority" && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 px-2 mb-2"
-        >
-          <span className="text-xs font-semibold text-themeMuted uppercase tracking-wider mr-2">Filter</span>
-          <button
-            onClick={() => setPriorityFilter("All")}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${priorityFilter === "All"
-              ? "bg-purple-500 text-white shadow-lg shadow-purple-500/20"
-              : "bg-themeCard text-themeMuted hover:bg-white/5 border border-white/5"
-              }`}
-          >
-            All
-          </button>
-          {[3, 2, 1].map((p) => (
-            <button
-              key={p}
-              onClick={() => setPriorityFilter(p as 1 | 2 | 3)}
-              className={`px-4 py-2 rounded-xl text-sm transition-all ${priorityFilter === p
-                ? "bg-purple-500 text-white shadow-lg shadow-purple-500/20"
-                : "bg-themeCard text-themeMuted hover:bg-white/5 border border-white/5"
-                }`}
-              title={`${p} Stars`}
-            >
-              {Array(p).fill("⭐").join("")}
-            </button>
-          ))}
-        </motion.div>
-      )}
-
-      {/* ===== CATEGORY SUB-FILTER ===== */}
-      {mode === "categories" && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 px-2 mb-2"
-        >
-          <span className="text-xs font-semibold text-themeMuted uppercase tracking-wider mr-2">Filter</span>
-          {["URL", "Media"].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${categoryFilter === cat
-                ? "bg-purple-500 text-white shadow-lg shadow-purple-500/20"
-                : "bg-themeCard text-themeMuted hover:bg-white/5 border border-white/5"
-                }`}
-            >
-              {cat === "URL" ? "URL" : cat === "Media" ? "Media" : "All"}
-            </button>
-          ))}
-        </motion.div>
-      )}
+      <BookmarkSubFilters
+        mode={mode}
+        priorityFilter={priorityFilter}
+        onPriorityChange={setPriorityFilter}
+        categoryFilter={categoryFilter}
+        onCategoryChange={setCategoryFilter}
+      />
 
       {/* ===== CONTENT AREA ===== */}
       <AnimatePresence mode="wait">
@@ -820,196 +625,44 @@ export default function BookmarkContainer({
                 onDelete={requestDeleteBookmark}
                 onArchive={archiveBookmark}
                 onUnarchive={unarchiveBookmark}
-                onEdit={(bookmark) => {
-                  setEditingBookmark(bookmark)
-                  setEditTitle(bookmark.title)
-                  setEditUrl(bookmark.url || "")
-                  setEditDescription(bookmark.description || "")
-                  setEditPriority((bookmark.priority as 1 | 2 | 3) || "Auto")
-                }}
+                onEdit={setEditingBookmark}
               />
             ))}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ADD/EDIT MODAL (Preserved logic, updated styles) */}
+      {/* ADD/EDIT MODAL (mounted only while open, so its fields and file reset on close) */}
       {(isAddOpen || editingBookmark) && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <motion.div
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-themeCard w-full max-w-3xl md:max-w-4xl p-5 md:p-6 rounded-3xl shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto hide-scrollbar"
-          >
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* LEFT DESIGN PANEL */}
-              <div className="hidden md:flex flex-col justify-between flex-1 rounded-2xl bg-gradient-to-b from-purple-500/25 via-purple-500/10 to-transparent border border-white/10 px-5 py-5">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-purple-200/80 mb-2">
-                    New Bookmark
-                  </p>
-                  <h2 className="text-2xl font-semibold text-white mb-3 leading-snug">
-                    Capture the links that
-                    <br />
-                    actually matter to you.
-                  </h2>
-                  <p className="text-sm text-themeMuted/90">
-                    Give each bookmark a clear title, context, and priority so future-you can
-                    rediscover it in seconds.
-                  </p>
-                </div>
-
-                <div className="mt-6 grid grid-cols-2 gap-3 text-[11px] text-themeMuted/90">
-                  <div className="rounded-xl bg-black/20 border border-white/5 px-3 py-2">
-                    <p className="font-medium text-white mb-1">Stay organised</p>
-                    <p>Use notes & priority to group what&apos;s truly important.</p>
-                  </div>
-                  <div className="rounded-xl bg-black/20 border border-white/5 px-3 py-2">
-                    <p className="font-medium text-white mb-1">Never lose a gem</p>
-                    <p>VaultIX keeps tutorials, docs and ideas ready to revisit.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT FORM PANEL */}
-              <div className="flex-1 bg-themeMain/40 md:bg-transparent rounded-2xl md:rounded-none md:border-l md:border-white/5 md:pl-5">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-themeText">
-                    {editingBookmark ? "Edit Bookmark" : "Store in Vault"}
-                  </h3>
-                  <button
-                    onClick={() => { setIsAddOpen(false); setEditingBookmark(null); }}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-themeSurface hover:bg-white/10 text-themeMuted transition-colors text-sm"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-col md:flex-row gap-3">
-                    <div className="space-y-1 flex-1">
-                      <label className="text-[11px] font-medium text-themeMuted uppercase tracking-wider ml-0.5">
-                        Title
-                      </label>
-                      <input
-                        className="w-full px-3 py-2.5 rounded-xl bg-themeSurface border border-white/5 text-themeText focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all placeholder:text-themeMuted/50 text-sm"
-                        placeholder="E.g. Great React Tutorial"
-                        value={(editingBookmark ? editTitle : title) || ""}
-                        onChange={(e) => editingBookmark ? setEditTitle(e.target.value) : setTitle(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-1 flex-1">
-                      <label className="text-[11px] font-medium text-themeMuted uppercase tracking-wider ml-0.5">
-                        URL
-                      </label>
-                      <input
-                        className="w-full px-3 py-2.5 rounded-xl bg-themeSurface border border-white/5 text-themeText focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all placeholder:text-themeMuted/50 text-sm"
-                        placeholder="https://..."
-                        value={(editingBookmark ? editUrl : url) || ""}
-                        onChange={(e) => editingBookmark ? setEditUrl(e.target.value) : setUrl(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col md:flex-row gap-3">
-                    <div className="space-y-1 flex-1">
-                      <label className="text-[11px] font-medium text-themeMuted uppercase tracking-wider ml-0.5">
-                        Upload Media (Optional)
-                      </label>
-                      <input
-                        type="file"
-                        accept="image/*,video/*,.pdf"
-                        onChange={(e) => setMediaFile(e.target.files ? e.target.files[0] : null)}
-                        className="w-full px-3 py-2.5 rounded-xl bg-themeSurface border border-white/5 text-themeText file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-500 file:text-white hover:file:bg-purple-600 transition-all cursor-pointer text-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1 flex-1">
-                      <label className="text-[11px] font-medium text-themeMuted uppercase tracking-wider ml-0.5">
-                        Priority
-                      </label>
-                      <select
-                        value={editingBookmark ? editPriority : manualPriority}
-                        onChange={(e) => {
-                          const val = e.target.value === "Auto" ? "Auto" : Number(e.target.value) as 1 | 2 | 3;
-                          editingBookmark ? setEditPriority(val as any) : setManualPriority(val);
-                        }}
-                        className="w-full px-3 py-2.5 rounded-xl bg-themeSurface border border-white/5 text-themeText focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all appearance-none text-sm"
-                      >
-                        <option value="Auto">Auto Priority</option>
-                        <option value={3}>⭐⭐⭐ High Priority</option>
-                        <option value={2}>⭐⭐ Normal Priority</option>
-                        <option value={1}>⭐ Low Priority</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-medium text-themeMuted uppercase tracking-wider ml-0.5">
-                      Notes
-                    </label>
-                    <textarea
-                      className="w-full px-3 py-2.5 rounded-xl bg-themeSurface border border-white/5 text-themeText focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all placeholder:text-themeMuted/50 min-h-[70px] resize-none text-sm"
-                      placeholder="Why are you saving this?"
-                      value={(editingBookmark ? editDescription : description) || ""}
-                      onChange={(e) => editingBookmark ? setEditDescription(e.target.value) : setDescription(e.target.value)}
-                    />
-                  </div>
-
-                  <button
-                    onClick={editingBookmark ? updateBookmark : addBookmark}
-                    className="w-full mt-2 bg-purple-500 hover:bg-purple-600 py-2.5 rounded-xl font-medium text-white transition-all shadow-lg shadow-purple-500/25 border border-purple-400/20 active:scale-[0.98] text-sm"
-                  >
-                    {editingBookmark ? "Save Changes" : "Store in Vault"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
+        <BookmarkFormModal
+          key={editingBookmark ? editingBookmark.id : "add"}
+          mode={editingBookmark ? "edit" : "add"}
+          initial={
+            editingBookmark
+              ? {
+                  title: editingBookmark.title,
+                  url: editingBookmark.url || "",
+                  description: editingBookmark.description || "",
+                  priority: (editingBookmark.priority as 1 | 2 | 3) || "Auto",
+                }
+              : EMPTY_FORM
+          }
+          onSubmit={editingBookmark ? updateBookmark : addBookmark}
+          onClose={() => { setIsAddOpen(false); setEditingBookmark(null); }}
+        />
       )}
 
       {/* DELETE CONFIRMATION MODAL */}
       <AnimatePresence>
         {deleteTarget && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.18 }}
-              className="bg-themeCard w-full max-w-sm p-5 rounded-2xl shadow-2xl border border-white/10"
-            >
-              <h3 className="text-lg font-semibold text-themeText mb-2">
-                Delete this bookmark?
-              </h3>
-              <p className="text-sm text-themeMuted mb-5">
-                {deleteTarget.title
-                  ? `“${deleteTarget.title}” will be removed from your vault. This action cannot be undone.`
-                  : "This bookmark will be removed from your vault. This action cannot be undone."}
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setDeleteTarget(null)}
-                  className="px-4 py-2 rounded-xl bg-themeSurface text-sm text-themeText border border-white/10 hover:bg-white/5 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    if (deleteTarget) {
-                      deleteBookmark(deleteTarget.id)
-                    }
-                    setDeleteTarget(null)
-                  }}
-                  className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-sm text-white font-medium shadow-lg shadow-red-500/30 border border-red-400/40 transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
-            </motion.div>
-          </div>
+          <DeleteConfirmModal
+            title={deleteTarget.title}
+            onConfirm={() => {
+              deleteBookmark(deleteTarget.id)
+              setDeleteTarget(null)
+            }}
+            onCancel={() => setDeleteTarget(null)}
+          />
         )}
       </AnimatePresence>
 
