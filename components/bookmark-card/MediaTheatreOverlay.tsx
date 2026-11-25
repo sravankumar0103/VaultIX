@@ -8,9 +8,8 @@ type Props = {
   show: boolean
   onClose: () => void
   bookmark: Bookmark
-  mediaType: "pdf" | "video" | "generic"
-  isDirectVideoFile: boolean
-  cardLink: string | undefined
+  mediaUrl: string | null
+  mediaKind: "pdf" | "video" | null
   domainName: string
 }
 
@@ -18,14 +17,12 @@ export default function MediaTheatreOverlay({
   show,
   onClose,
   bookmark,
-  mediaType,
-  isDirectVideoFile,
-  cardLink,
+  mediaUrl,
+  mediaKind,
   domainName,
 }: Props) {
-  const isPdf = mediaType === "pdf"
-  const isVideo = mediaType === "video" || isDirectVideoFile
-  const finalMediaUrl = isDirectVideoFile ? bookmark.url : (bookmark.url || bookmark.media_url)
+  const isPdf = mediaKind === "pdf"
+  const isVideo = mediaKind === "video"
 
   return (
     <AnimatePresence>
@@ -73,16 +70,17 @@ export default function MediaTheatreOverlay({
 
             {/* Viewer Content */}
             <div className="flex-1 w-full h-full bg-black relative flex items-center justify-center">
-              {finalMediaUrl ? (
+              {mediaUrl ? (
                 isPdf ? (
                   <iframe
-                    src={finalMediaUrl}
+                    src={mediaUrl}
                     className="w-full h-full border-0"
-                    title="PDF Viewer"
+                    loading="lazy"
+                    title={`PDF viewer: ${bookmark.title}`}
                   />
                 ) : isVideo ? (
                   <video
-                    src={finalMediaUrl}
+                    src={mediaUrl}
                     controls
                     autoPlay
                     className="max-w-full max-h-full"
@@ -91,7 +89,7 @@ export default function MediaTheatreOverlay({
                   <div className="text-center space-y-4">
                     <ExternalLink size={48} className="text-white/10 mx-auto" strokeWidth={1} />
                     <p className="text-themeMuted font-medium italic">Preview not available for this type.</p>
-                    <a href={cardLink} target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-2 bg-purple-500 rounded-full font-bold text-sm">Open in New Tab</a>
+                    <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="inline-block px-6 py-2 bg-purple-500 rounded-full font-bold text-sm">Open in New Tab</a>
                   </div>
                 )
               ) : (

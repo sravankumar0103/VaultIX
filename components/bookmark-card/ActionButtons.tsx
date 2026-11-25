@@ -11,6 +11,7 @@ export type ActionButtonsProps = {
   onArchive: (id: string) => void
   onUnarchive?: (id: string) => void
   onEdit: (bookmark: Bookmark) => void
+  isPending?: boolean
 }
 
 export default function ActionButtons({
@@ -20,6 +21,7 @@ export default function ActionButtons({
   onArchive,
   onUnarchive,
   onEdit,
+  isPending = false,
 }: ActionButtonsProps) {
   return (
     <motion.div
@@ -32,7 +34,9 @@ export default function ActionButtons({
     >
       <button
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(bookmark) }}
-        className="p-2 text-themeMuted hover:text-purple-500 hover:bg-purple-500/10 rounded-lg transition-colors"
+        className="p-2 text-themeMuted hover:text-purple-500 hover:bg-purple-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isPending}
+        aria-disabled={isPending}
         title="Edit"
       >
         <Edit2 size={16} />
@@ -41,7 +45,9 @@ export default function ActionButtons({
       {bookmark.is_archived ? (
         <button
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onUnarchive?.(bookmark.id) }}
-          className="p-2 text-themeMuted hover:text-green-500 hover:bg-green-500/10 rounded-lg transition-colors"
+          className="p-2 text-themeMuted hover:text-green-500 hover:bg-green-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isPending}
+          aria-disabled={isPending}
           title="Unarchive"
         >
           <ArchiveRestore size={16} />
@@ -49,7 +55,9 @@ export default function ActionButtons({
       ) : (
         <button
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onArchive(bookmark.id) }}
-          className="p-2 text-themeMuted hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-colors"
+          className="p-2 text-themeMuted hover:text-orange-500 hover:bg-orange-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isPending}
+          aria-disabled={isPending}
           title="Archive"
         >
           <Archive size={16} />
@@ -58,7 +66,9 @@ export default function ActionButtons({
 
       <button
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(bookmark.id) }}
-        className="p-2 text-themeMuted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+        className="p-2 text-themeMuted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled={isPending}
+        aria-disabled={isPending}
         title="Delete"
       >
         <Trash2 size={16} />
