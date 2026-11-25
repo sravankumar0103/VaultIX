@@ -1,7 +1,7 @@
-import nodemailer from "nodemailer"
+import nodemailer, { type Transporter } from "nodemailer"
 
 const globalForMailer = globalThis as typeof globalThis & {
-  __vaultixMailTransporter?: nodemailer.Transporter
+  __vaultixMailTransporter?: Transporter
 }
 
 export function getMailTransporter() {

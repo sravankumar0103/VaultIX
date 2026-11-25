@@ -30,7 +30,7 @@ VaultIX is a high-fidelity bookmark and knowledge management platform designed f
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Charts**: [Recharts](https://recharts.org/)
 - **Email**: [Nodemailer](https://nodemailer.com/) + Gmail SMTP
-- **Exports**: [jsPDF](https://github.com/parallax/jsPDF) & [html2canvas](https://html2canvas.hertzen.com/)
+- **Exports**: [jsPDF](https://github.com/parallax/jsPDF) & [html-to-image](https://github.com/bubkoo/html-to-image)
 
 ---
 
