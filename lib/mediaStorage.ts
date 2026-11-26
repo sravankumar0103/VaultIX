@@ -1,6 +1,7 @@
 export const MEDIA_BUCKET = "media"
 export const MEDIA_PUBLIC_PREFIX = "/storage/v1/object/public/media/"
-export const MEDIA_MAX_BYTES = 50 * 1024 * 1024
+// Same as the `media` bucket file_size_limit (10485760); keep the two in step.
+export const MEDIA_MAX_BYTES = 10 * 1024 * 1024
 
 export type FileLike = { name: string; type: string; size: number }
 
@@ -42,7 +43,7 @@ export function validateMediaFile(file: FileLike): { ok: true; ext: string } | {
   const allowed = file.type.startsWith("image/") || file.type.startsWith("video/") || file.type === "application/pdf"
   if (!allowed) return { ok: false, message: "Only images, videos and PDFs can be uploaded." }
   if (file.size <= 0) return { ok: false, message: "This file is empty." }
-  if (file.size > MEDIA_MAX_BYTES) return { ok: false, message: "Files must be 50 MB or smaller." }
+  if (file.size > MEDIA_MAX_BYTES) return { ok: false, message: "Files must be 10 MB or smaller." }
   const mapped = EXTENSIONS[file.type]
   if (mapped) return { ok: true, ext: mapped }
   const match = file.name.match(/\.([a-z0-9]{1,5})$/i)

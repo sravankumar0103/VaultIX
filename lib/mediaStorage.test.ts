@@ -68,10 +68,14 @@ describe("validateMediaFile", () => {
       message: "Only images, videos and PDFs can be uploaded.",
     })
   })
+  it("matches the 10 MB limit of the media bucket", () => {
+    expect(MEDIA_MAX_BYTES).toBe(10485760)
+    expect(validateMediaFile(f("a.png", "image/png", 10485760))).toEqual({ ok: true, ext: "png" })
+  })
   it("refuses oversize and empty files", () => {
     expect(validateMediaFile(f("a.png", "image/png", MEDIA_MAX_BYTES + 1))).toEqual({
       ok: false,
-      message: "Files must be 50 MB or smaller.",
+      message: "Files must be 10 MB or smaller.",
     })
     expect(validateMediaFile(f("a.png", "image/png", 0))).toEqual({ ok: false, message: "This file is empty." })
   })
