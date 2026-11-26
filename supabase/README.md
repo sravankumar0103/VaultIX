@@ -21,6 +21,12 @@ Notes on the order:
 - Never apply C3 before the Vault secrets exist. Without them the trigger only logs a warning and
   no deletion mail is sent.
 - Apply C4 last, after the deploy. Its last result set is a summary table of 25 rows: read the "actual" column against "expected" (the storage and policy rows print the real policy text).
+- If C4 prints that it could not create the storage policy (the SQL editor role may lack the privilege on `storage.objects`), create it by hand in the dashboard (Storage → Policies → `media` → New policy → For full customization), with the name EXACTLY as below (the summary row looks for it), then run the summary again:
+  ```sql
+  create policy "Users can delete their own media" on storage.objects
+    for delete to authenticated
+    using (bucket_id = 'media' and (owner_id = (select auth.uid())::text or owner = (select auth.uid())));
+  ```
 - Every file is idempotent and deletes no rows. A NOTICE that says "ask the owner" means some rows
   were left as they are and need a decision.
 
