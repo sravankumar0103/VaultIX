@@ -18,6 +18,7 @@ export default function MobileHeader({ onOpenMenu }: { onOpenMenu: () => void })
 
       <button
         onClick={onOpenMenu}
+        aria-label="Open menu"
         className="p-2.5 rounded-xl bg-white/5 border border-white/5 text-themeMuted hover:text-themeText transition-all active:scale-95"
       >
         <Menu size={20} />

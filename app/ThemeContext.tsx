@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react"
 import {
   applyThemeToDocument,
   clearSessionThemeOverride,
@@ -18,22 +18,16 @@ type ThemeContextType = {
   toggleTheme: () => void
   setDefaultTheme: (theme: Theme) => void
   syncThemeFromAccount: (theme: Theme) => void
-  resetThemeToDefault: () => void
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null)
 
+const subscribeNoop = () => () => {}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => resolveStoredTheme())
-  const [isHydrated, setIsHydrated] = useState(false)
-
-  useEffect(() => {
-    const hydrationFrame = window.requestAnimationFrame(() => {
-      setIsHydrated(true)
-    })
-
-    return () => window.cancelAnimationFrame(hydrationFrame)
-  }, [])
+  // false while server rendering and hydrating, true on every client render after that
+  const isHydrated = useSyncExternalStore(subscribeNoop, () => true, () => false)
 
   useEffect(() => {
     if (!isHydrated) {
@@ -43,44 +37,38 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyThemeToDocument(theme)
   }, [theme, isHydrated])
 
-  const setTheme = (nextTheme: Theme) => {
+  const setTheme = useCallback((nextTheme: Theme) => {
     setThemeState(nextTheme)
-  }
+  }, [])
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setThemeState((previousTheme) => {
       const nextTheme = previousTheme === "dark" ? "light" : "dark"
       persistSessionTheme(nextTheme)
       return nextTheme
     })
-  }
+  }, [])
 
-  const setDefaultTheme = (nextTheme: Theme) => {
+  const setDefaultTheme = useCallback((nextTheme: Theme) => {
     persistDefaultTheme(nextTheme)
     clearSessionThemeOverride()
     setThemeState(nextTheme)
-  }
+  }, [])
 
-  const syncThemeFromAccount = (nextTheme: Theme) => {
+  const syncThemeFromAccount = useCallback((nextTheme: Theme) => {
     persistDefaultTheme(nextTheme)
 
     if (!getStoredSessionTheme()) {
       setThemeState(nextTheme)
     }
-  }
+  }, [])
 
-  const resetThemeToDefault = () => {
-    clearSessionThemeOverride()
-    setThemeState(resolveStoredTheme())
-  }
-
-  return (
-    <ThemeContext.Provider
-      value={{ theme, isHydrated, setTheme, toggleTheme, setDefaultTheme, syncThemeFromAccount, resetThemeToDefault }}
-    >
-      {children}
-    </ThemeContext.Provider>
+  const value = useMemo(
+    () => ({ theme, isHydrated, setTheme, toggleTheme, setDefaultTheme, syncThemeFromAccount }),
+    [theme, isHydrated, setTheme, toggleTheme, setDefaultTheme, syncThemeFromAccount],
   )
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme() {

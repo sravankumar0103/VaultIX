@@ -15,11 +15,26 @@ import {
 } from "recharts"
 import { motion, AnimatePresence } from "framer-motion"
 
+export type GrowthPoint = { name: string; count: number }
+export type DistributionPoint = { name: string; value: number }
+
+type TooltipEntry = {
+    name?: string | number
+    value?: string | number
+    payload?: { name?: string }
+}
+
+type CustomTooltipProps = {
+    active?: boolean
+    payload?: TooltipEntry[]
+    label?: string | number
+}
+
 // --- Custom Styled Tooltip ---
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
-        const name = payload[0].name || data.name || label || "Data";
+        const name = payload[0].name || data?.name || label || "Data";
 
         return (
             <div className="glass p-3 border-none rounded-2xl shadow-2xl min-w-[120px]">
@@ -35,7 +50,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 }
 
 // --- 1. GROWTH AREA CHART ---
-export const GrowthChart = ({ data }: { data: any[] }) => {
+export const GrowthChart = ({ data }: { data: GrowthPoint[] }) => {
     return (
         <div className="w-full h-40">
             <ResponsiveContainer width="100%" height="100%">
@@ -80,7 +95,7 @@ export const GrowthChart = ({ data }: { data: any[] }) => {
 }
 
 // --- 2. DISTRIBUTION PIE CHART (Apple-Style Dynamic Center) ---
-export const DistributionChart = ({ data }: { data: any[] }) => {
+export const DistributionChart = ({ data }: { data: DistributionPoint[] }) => {
     const [activeIndex, setActiveIndex] = React.useState(-1)
     const COLORS = ["#a855f7", "#d946ef", "#6366f1", "#06b6d4"]
     const total = data.reduce((acc, curr) => acc + curr.value, 0)

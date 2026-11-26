@@ -1,4 +1,3 @@
-"use client"
 import BookmarkContainer from "@/components/BookmarkContainer"
 
 export default function ArchivedPage() {

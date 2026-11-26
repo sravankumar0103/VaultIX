@@ -1,55 +1,89 @@
-import { createClient } from "@supabase/supabase-js"
 import { NextRequest, NextResponse } from "next/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { sendAccountDeletedEmail } from "@/lib/accountEmails"
+import { getMediaPathFromUrl } from "@/lib/mediaStorage"
 import { releaseRequestLock, tryAcquireRequestLock } from "@/lib/requestLocks"
+import { getUserFromBearer } from "@/lib/server/auth"
+import { jsonError } from "@/lib/server/http"
+import { dropSharedMediaPaths, removeMediaObjects } from "@/lib/server/mediaCleanup"
+import { getSupabaseAdmin } from "@/lib/server/supabaseAdmin"
+
+export const runtime = "nodejs"
 
 const SKIP_DELETE_EMAIL_WEBHOOK_FLAG = "skip_account_deleted_email_webhook"
+const PAGE_SIZE = 1000
+const DELETION_FAILED = "Account deletion failed. Please try again."
+const PREPARE_FAILED = "Failed to prepare account deletion"
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-)
+// Supabase Auth merges app_metadata keys on update, and null removes the key (P20).
+async function clearDeleteWebhookFlag(userId: string) {
+  try {
+    const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, {
+      app_metadata: { [SKIP_DELETE_EMAIL_WEBHOOK_FLAG]: null },
+    })
 
-async function restoreDeleteWebhookFlag(userId: string, appMetadata: Record<string, unknown>) {
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    app_metadata: appMetadata,
-  })
-
-  if (error) {
+    if (error) {
+      console.error("Failed to roll back deletion email handling flag:", error)
+    }
+  } catch (error: unknown) {
     console.error("Failed to roll back deletion email handling flag:", error)
   }
 }
 
+// Reads every media object name on the user's bookmarks, page by page. Returns null
+// when a page cannot be read, so the caller can stop before deleting anything.
+async function readUserMediaPaths(
+  supabaseAdmin: SupabaseClient,
+  userId: string
+): Promise<string[] | null> {
+  const paths = new Set<string>()
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabaseAdmin
+      .from("bookmarks")
+      .select("media_url")
+      .eq("user_id", userId)
+      .order("id")
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (error || !data) {
+      console.error("Failed to read media paths for account deletion:", error)
+      return null
+    }
+
+    for (const row of data) {
+      const path = getMediaPathFromUrl(row.media_url)
+      if (path) {
+        paths.add(path)
+      }
+    }
+
+    if (data.length < PAGE_SIZE) {
+      return [...paths]
+    }
+  }
+}
+
 export async function POST(req: NextRequest) {
+  // Set once the skip flag is on and cleared once the auth user is gone, so the outer
+  // catch knows whether a rollback is still needed.
+  let flaggedUserId: string | null = null
+
   try {
-    const authHeader = req.headers.get("Authorization")
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const user = await getUserFromBearer(req)
+    if (!user) {
+      return jsonError(401, "Unauthorized")
     }
 
-    const token = authHeader.replace("Bearer ", "")
-    const {
-      data: { user },
-      error: authError,
-    } = await supabaseAdmin.auth.getUser(token)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
-    }
-
+    const supabaseAdmin = getSupabaseAdmin()
     const userId = user.id
-    const userEmail = user.email!
+    const userEmail = user.email
     const userName =
       user.user_metadata?.full_name || user.user_metadata?.name || "Customer"
-    const originalAppMetadata = (user.app_metadata ?? {}) as Record<string, unknown>
     const deleteLockKey = `delete-account:${userId}`
 
     if (!tryAcquireRequestLock(deleteLockKey, 60_000)) {
-      return NextResponse.json(
-        { error: "Account deletion already in progress" },
-        { status: 409 }
-      )
+      return jsonError(409, "Account deletion already in progress")
     }
 
     try {
@@ -57,7 +91,7 @@ export async function POST(req: NextRequest) {
         userId,
         {
           app_metadata: {
-            ...originalAppMetadata,
+            ...user.app_metadata,
             [SKIP_DELETE_EMAIL_WEBHOOK_FLAG]: true,
           },
         }
@@ -65,37 +99,18 @@ export async function POST(req: NextRequest) {
 
       if (metadataError) {
         console.error("Failed to prepare deletion email handling:", metadataError)
-        return NextResponse.json(
-          { error: "Failed to prepare account deletion" },
-          { status: 500 }
-        )
+        return jsonError(500, PREPARE_FAILED)
       }
 
-      const { data: userBookmarks } = await supabaseAdmin
-        .from("bookmarks")
-        .select("media_url")
-        .eq("user_id", userId)
+      flaggedUserId = userId
 
-      if (userBookmarks && userBookmarks.length > 0) {
-        const storagePrefix = "/storage/v1/object/public/media/"
-        const filePaths = userBookmarks
-          .filter((bookmark) => bookmark.media_url)
-          .map((bookmark) => {
-            const url = bookmark.media_url
-            const index = url.indexOf(storagePrefix)
-            return index !== -1 ? url.slice(index + storagePrefix.length) : null
-          })
-          .filter(Boolean) as string[]
-
-        if (filePaths.length > 0) {
-          const { error: storageError } = await supabaseAdmin.storage
-            .from("media")
-            .remove(filePaths)
-
-          if (storageError) {
-            console.error("Storage cleanup error (non-fatal):", storageError)
-          }
-        }
+      // Collected before anything is deleted: once the auth user is gone the rows may
+      // already be gone too (FK cascade).
+      const mediaPaths = await readUserMediaPaths(supabaseAdmin, userId)
+      if (!mediaPaths) {
+        await clearDeleteWebhookFlag(userId)
+        flaggedUserId = null
+        return jsonError(500, PREPARE_FAILED)
       }
 
       const { error: complaintsError } = await supabaseAdmin
@@ -105,55 +120,66 @@ export async function POST(req: NextRequest) {
 
       if (complaintsError) {
         console.error("Complaints deletion error:", complaintsError)
-        await restoreDeleteWebhookFlag(userId, originalAppMetadata)
-
-        return NextResponse.json(
-          { error: "Failed to purge user feedback data" },
-          { status: 500 }
-        )
+        await clearDeleteWebhookFlag(userId)
+        flaggedUserId = null
+        return jsonError(500, DELETION_FAILED)
       }
 
-      const { error: bookmarksError } = await supabaseAdmin
-        .from("bookmarks")
-        .delete()
-        .eq("user_id", userId)
-
-      if (bookmarksError) {
-        console.error("Bookmarks deletion error:", bookmarksError)
-        await restoreDeleteWebhookFlag(userId, originalAppMetadata)
-
-        return NextResponse.json(
-          { error: "Failed to purge user bookmarks" },
-          { status: 500 }
-        )
-      }
-
+      // The auth user goes before bookmarks and media, so a failure here loses no data.
       const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
       if (deleteError) {
         console.error("Auth delete error:", deleteError)
-        await restoreDeleteWebhookFlag(userId, originalAppMetadata)
-
-        return NextResponse.json(
-          { error: `Auth deletion failed: ${deleteError.message}` },
-          { status: 500 }
-        )
+        await clearDeleteWebhookFlag(userId)
+        flaggedUserId = null
+        return jsonError(500, DELETION_FAILED)
       }
 
+      flaggedUserId = null
+
+      // The account is gone from here on: each cleanup step logs its own failure, and
+      // none of them is returned or stops the next step.
       try {
-        await sendAccountDeletedEmail({
-          email: userEmail,
-          name: userName,
-        })
-      } catch (emailError) {
-        console.error("Farewell email failed (non-blocking):", emailError)
+        const { error: bookmarksError } = await supabaseAdmin
+          .from("bookmarks")
+          .delete()
+          .eq("user_id", userId)
+
+        if (bookmarksError) {
+          console.error("Bookmarks cleanup error (non-fatal):", bookmarksError)
+        }
+      } catch (bookmarksError: unknown) {
+        console.error("Bookmarks cleanup error (non-fatal):", bookmarksError)
+      }
+
+      let removablePaths: string[] = []
+      try {
+        removablePaths = await dropSharedMediaPaths(supabaseAdmin, userId, mediaPaths)
+      } catch (checkError: unknown) {
+        console.error("Shared media check failed, keeping all media objects:", checkError)
+      }
+
+      await removeMediaObjects(supabaseAdmin, removablePaths)
+
+      if (userEmail) {
+        try {
+          await sendAccountDeletedEmail({
+            email: userEmail,
+            name: userName,
+          })
+        } catch (emailError: unknown) {
+          console.error("Farewell email failed (non-blocking):", emailError)
+        }
       }
 
       return NextResponse.json({ success: true })
     } finally {
       releaseRequestLock(deleteLockKey)
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Delete account error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    if (flaggedUserId) {
+      await clearDeleteWebhookFlag(flaggedUserId)
+    }
+    return jsonError(500, "Internal server error")
   }
 }

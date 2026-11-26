@@ -2,22 +2,25 @@
   "name": "vaultix",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/supabase-js": "^2.95.3",
     "framer-motion": "^12.34.0",
     "html-to-image": "^1.11.13",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^4.2.0",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.574.0",
-    "next": "16.1.6",
-    "nodemailer": "^8.0.1",
+    "next": "16.4.6",
+    "nodemailer": "^10.6.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
@@ -26,12 +29,13 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/nodemailer": "^7.0.11",
+    "@types/nodemailer": "^7.0.12",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.4.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

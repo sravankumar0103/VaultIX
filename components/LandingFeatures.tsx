@@ -1,15 +1,11 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { memo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import {
   Search,
-  BarChart3,
   Database,
-  Lock,
-  Zap,
   ShieldCheck,
-  ChevronRight,
   ArrowRight,
   Monitor,
   Cloud,
@@ -20,20 +16,14 @@ import {
   Globe,
   Stars,
   Star,
-  Users,
   Box,
-  MousePointer2,
   Sun,
   Moon,
   ShieldAlert,
-  Send,
-  Fingerprint,
-  Activity,
-  CheckCircle2,
-  Key
+  CheckCircle2
 } from 'lucide-react';
 
-export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => void }) {
+function LandingFeatures({ onOpenVault }: { onOpenVault?: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -86,7 +76,6 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
             title="Store smarter."
             desc="Store more than just links. VaultIX handles articles, PDFs, and media files as unified resources."
             badge="Universal Storage"
-            icon={<Database className="w-5 h-5 text-purple-400" />}
             visual={<UniversalVaultVisual />}
           />
 
@@ -97,7 +86,6 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
             title="Find faster."
             desc="Search like you think. Organise your bookmarks with priority, categories, and smart filters to find what you need in seconds."
             badge="Smart Search"
-            icon={<Search className="w-5 h-5 text-purple-400" />}
             visual={<FilterSortVisualizer />}
           />
 
@@ -106,7 +94,6 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
             title="Strictly Private."
             desc="Your workspace is yours alone. Fully private and encrypted, ensuring that only you can access and unlock your stored information."
             badge="Private by Default"
-            icon={<ShieldCheck className="w-5 h-5 text-purple-400" />}
             visual={<PrivacyLock />}
           />
 
@@ -116,7 +103,6 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
             title="Deep insights."
             desc="Visualize your collection trends. Simple analytics and smart insights that help you understand your vault growth at a glance."
             badge="Visual Intelligence"
-            icon={<BarChart3 className="w-5 h-5 text-purple-400" />}
             visual={<InsightChart />}
           />
         </div>
@@ -242,7 +228,19 @@ export default function LandingFeatures({ onOpenVault }: { onOpenVault?: () => v
   );
 }
 
-function HybridRefinedSection({ number, title, desc, icon, badge, visual, reversed, plain }: any) {
+export default memo(LandingFeatures);
+
+type HybridRefinedSectionProps = {
+  number: string
+  title: string
+  desc: string
+  badge: string
+  visual: ReactNode
+  reversed?: boolean
+  plain?: boolean
+}
+
+function HybridRefinedSection({ number, title, desc, badge, visual, reversed, plain }: HybridRefinedSectionProps) {
   return (
     <div className={`flex flex-col md:flex-row items-center gap-20 md:gap-40 ${reversed ? 'md:flex-row-reverse' : ''}`}>
       <motion.div
@@ -290,7 +288,15 @@ function HybridRefinedSection({ number, title, desc, icon, badge, visual, revers
   );
 }
 
-function BentoCard({ className, icon, title, desc, visual }: any) {
+type BentoCardProps = {
+  className: string
+  icon: ReactElement<{ size?: number }>
+  title: string
+  desc: string
+  visual: ReactNode
+}
+
+function BentoCard({ className, icon, title, desc, visual }: BentoCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -448,43 +454,6 @@ function PrismRefractionVisualizer() {
   );
 }
 
-/* --- DEPRECATED VISUALIZERS --- */
-
-function AtmosphericOrbVisualizer() {
-  return null;
-}
-
-function AtmosphericVisualizer() {
-  return (
-    <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
-      <motion.div
-        animate={{
-          scale: [1, 1.2, 1],
-          background: [
-            "radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%)",
-            "radial-gradient(circle, rgba(251,191,36,0.15) 0%, transparent 70%)",
-            "radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%)"
-          ]
-        }}
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-0"
-      />
-      <div className="relative z-10 flex flex-col items-center gap-4">
-        <div className="w-24 h-24 rounded-full border border-white/20 flex items-center justify-center relative overflow-hidden backdrop-blur-xl">
-          <motion.div
-            animate={{ y: [40, -40, 40] }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            className="flex flex-col items-center gap-20"
-          >
-            <Sun className="w-10 h-10 text-orange-400 shadow-glow" />
-            <Moon className="w-10 h-10 text-indigo-400" />
-          </motion.div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function WipeVisualizer() {
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center gap-10">
@@ -513,6 +482,13 @@ function WipeVisualizer() {
 /* --- INFRASTRUCTURE VISUALIZERS (SUPERSEDED BY HIGH-FIDELITY) --- */
 
 function NeuralCubeVisualizer() {
+  const [particles] = useState(() =>
+    [...Array(6)].map(() => ({
+      x: [Math.random() * 40 - 20, Math.random() * 80 - 40],
+      y: [Math.random() * 40 - 20, Math.random() * 80 - 40],
+    }))
+  )
+
   return (
     <div className="relative w-full h-full flex items-center justify-center">
       <div className="relative w-40 h-40">
@@ -532,14 +508,14 @@ function NeuralCubeVisualizer() {
         </motion.div>
 
         {/* Neural Particles */}
-        {[...Array(6)].map((_, i) => (
+        {particles.map((p, i) => (
           <motion.div
             key={i}
             animate={{
               opacity: [0, 1, 0],
               scale: [0, 1.5, 0],
-              x: [Math.random() * 40 - 20, Math.random() * 80 - 40],
-              y: [Math.random() * 40 - 20, Math.random() * 80 - 40]
+              x: p.x,
+              y: p.y
             }}
             transition={{ duration: 3 + i, repeat: Infinity, delay: i * 0.5 }}
             className="absolute top-1/2 left-1/2 w-1 h-1 bg-purple-400 rounded-full"
@@ -610,138 +586,6 @@ function SyncEngineVisualizer() {
   );
 }
 
-/* --- DEPRECATED VISUALIZERS --- */
-
-function MultiDeviceSyncVisualizer() {
-  // Kept for code history but superseded by SyncEngineVisualizer
-  return null;
-}
-
-function SyncGridVisualizer() {
-  return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      <div className="grid grid-cols-5 gap-4 opacity-20">
-        {[...Array(15)].map((_, i) => (
-          <motion.div
-            key={i}
-            animate={{
-              background: ["rgba(96, 165, 250, 0)", "rgba(96, 165, 250, 0.4)", "rgba(96, 165, 250, 0)"],
-            }}
-            transition={{ duration: 4, repeat: Infinity, delay: i * 0.2 }}
-            className="w-2 h-2 rounded-full border border-blue-400/30"
-          />
-        ))}
-      </div>
-
-      {/* Global Pulse Indicator */}
-      <motion.div
-        animate={{ scale: [1, 1.5, 1], opacity: [0.1, 0.3, 0.1] }}
-        transition={{ duration: 5, repeat: Infinity }}
-        className="absolute w-40 h-40 bg-blue-500/10 rounded-full blur-3xl"
-      />
-
-      <motion.div
-        animate={{
-          x: [-30, 30, -30],
-          y: [20, -20, 20]
-        }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute z-20"
-      >
-        <MousePointer2 size={20} className="text-blue-400/40" />
-      </motion.div>
-    </div>
-  );
-}
-
-function RadarSearchVisualizer() {
-  return (
-    <div className="relative w-full h-full flex flex-col items-center justify-center gap-4">
-      <div className="relative w-48 h-12 flex items-center gap-2 overflow-hidden px-4">
-        {[...Array(6)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="flex-shrink-0 w-8 h-8 rounded-lg bg-white/5 border border-white/10"
-          />
-        ))}
-
-        {/* Scanning Beam */}
-        <motion.div
-          animate={{ x: [-100, 200] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-          className="absolute top-0 bottom-0 w-1 bg-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.5)] z-10"
-        />
-
-        {/* Highlighted Results */}
-        <motion.div
-          animate={{ opacity: [0, 1, 0] }}
-          transition={{ duration: 3, repeat: Infinity, delay: 1.5 }}
-          className="absolute left-24 w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 z-0"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 opacity-30">
-        <div className="w-16 h-1 bg-white/20 rounded-full" />
-        <div className="w-8 h-1 bg-purple-500/40 rounded-full" />
-      </div>
-    </div>
-  );
-}
-
-/* --- DEPRECATED VISUALIZERS --- */
-
-function BrainVisualizer() {
-  return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      <motion.div
-        animate={{ opacity: [0.1, 0.3, 0.1], scale: [1, 1.2, 1] }}
-        transition={{ duration: 6, repeat: Infinity }}
-        className="absolute w-60 h-60 bg-purple-500/10 rounded-full blur-[100px]"
-      />
-      <Cpu size={120} className="text-white/[0.02]" />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="w-40 h-40 border border-purple-500/10 rounded-full border-dashed"
-        />
-      </div>
-    </div>
-  );
-}
-
-function SyncVisualizer() {
-  return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      <motion.div
-        animate={{ x: [-40, 40, -40], y: [10, -10, 10] }}
-        transition={{ duration: 5, repeat: Infinity }}
-        className="absolute top-1/2 left-1/4"
-      >
-        <MousePointer2 size={24} className="text-purple-400 rotate-12" />
-      </motion.div>
-      <Monitor size={100} className="text-white/[0.02]" />
-      <div className="absolute top-1/3 right-1/4 p-2 rounded-lg bg-white/5 border border-white/10 shadow-xl backdrop-blur-md">
-        <div className="w-16 h-1 bg-white/20 rounded-full" />
-      </div>
-    </div>
-  );
-}
-
-function SearchVisualizer() {
-  return (
-    <div className="relative w-[200px] h-[200px]">
-      <motion.div
-        animate={{ rotateX: 360, rotateY: 360 }}
-        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-        className="w-full h-full border border-purple-500/20 rounded-2xl relative"
-      >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-purple-500/40 rounded-full blur-md" />
-      </motion.div>
-    </div>
-  );
-}
-
 /* --- CORE NARRATIVE ANIMATED REFS --- */
 
 function SearchPulse() {
@@ -777,6 +621,14 @@ function UniversalVaultVisual() {
     { icon: <Database className="w-5 h-5" />, color: "text-indigo-400", delay: 2.2 },
     { icon: <ShieldCheck className="w-5 h-5" />, color: "text-red-400", delay: 3.5 },
   ];
+
+  const [particles] = useState(() =>
+    [...Array(12)].map(() => ({
+      x: [Math.random() * 400 - 200, Math.random() * 400 - 200],
+      duration: 5 + Math.random() * 5,
+      delay: Math.random() * 5,
+    }))
+  )
 
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
@@ -847,168 +699,24 @@ function UniversalVaultVisual() {
       </div>
 
       {/* Digital Particles */}
-      {[...Array(12)].map((_, i) => (
+      {particles.map((p, i) => (
         <motion.div
           key={i}
           animate={{
             y: [-100, 100],
             opacity: [0, 1, 0],
-            x: [Math.random() * 400 - 200, Math.random() * 400 - 200]
+            x: p.x
           }}
           transition={{
-            duration: 5 + Math.random() * 5,
+            duration: p.duration,
             repeat: Infinity,
-            delay: Math.random() * 5
+            delay: p.delay
           }}
           className="absolute w-1 h-1 bg-purple-400/20 rounded-full blur-[1px]"
         />
       ))}
     </div>
   );
-}
-
-function UniversalStoreVisual() {
-  // Deprecated in favor of UniversalVaultVisual
-  return null;
-}
-
-function RefinedCardVisualizer() {
-  const bookmarks = [
-    {
-      title: "VaultIX",
-      domain: "vaultix-sk.verce...",
-      date: "Apr 12, 2026",
-      badge: "URL",
-      stars: 2,
-      favicon: "/vaultix-icon.png"
-    },
-    {
-      title: "Git-SK",
-      domain: "github.com",
-      date: "Apr 2, 2026",
-      badge: "URL",
-      stars: 3,
-      favicon: "https://www.google.com/s2/favicons?domain=github.com&sz=128"
-    },
-    {
-      title: "Robot",
-      domain: "",
-      date: "Mar 16, 2026",
-      badge: "MEDIA",
-      stars: 2,
-      favicon: "applevisual"
-    }
-  ];
-
-  return (
-    <div className="relative w-full h-full flex items-center justify-center p-8 overflow-hidden">
-      <div className="relative w-full max-w-[340px] flex flex-col gap-3">
-        {bookmarks.map((b, i) => (
-          <motion.div
-            key={i}
-            animate={{
-              y: [0, i === 0 ? 80 : -40, 0],
-              opacity: [1, 0.8, 1]
-            }}
-            transition={{
-              duration: 6,
-              repeat: Infinity,
-              delay: i * 0.5,
-              ease: "easeInOut"
-            }}
-            className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center gap-4 backdrop-blur-xl"
-          >
-            <div className="shrink-0 w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center p-1.5 overflow-hidden">
-              {b.favicon === "applevisual" ? (
-                <div className="w-full h-full rounded-lg bg-indigo-500/20 flex items-center justify-center">
-                  <Box className="w-4 h-4 text-indigo-400" />
-                </div>
-              ) : (
-                <img src={b.favicon} alt="favicon" className="w-[18px] h-[18px] object-contain opacity-80" />
-              )}
-            </div>
-            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-[12px] text-white/95 truncate">{b.title}</h3>
-                <span className="px-1.5 py-0.5 rounded-full bg-white/5 text-[8px] font-black text-white/15 uppercase tracking-widest border border-white/5">
-                  {b.badge}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[9px] text-white/30 font-medium truncate">
-                {b.domain && <span className="truncate max-w-[100px]">{b.domain}</span>}
-                {b.domain && <div className="w-0.5 h-0.5 rounded-full bg-white/10 shrink-0" />}
-                <span className="shrink-0">{b.date}</span>
-              </div>
-            </div>
-            <div className="flex gap-0.5 shrink-0 pl-3 border-l border-white/5">
-              {[...Array(3)].map((_, j) => (
-                <Star
-                  key={j}
-                  className={`w-2.5 h-2.5 ${j < b.stars ? 'text-yellow-500 fill-yellow-500' : 'text-white/5'}`}
-                />
-              ))}
-            </div>
-          </motion.div>
-        ))}
-
-        {/* Decorative Filter Pulse (From Dots Version) */}
-        <motion.div
-          animate={{ scale: [0.8, 1.1, 0.8], opacity: [0.2, 0.4, 0.2] }}
-          transition={{ duration: 4, repeat: Infinity }}
-          className="absolute -right-4 -top-4 w-24 h-24 bg-purple-500/10 rounded-full blur-3xl -z-10"
-        />
-      </div>
-    </div>
-  );
-}
-
-function FindFasterVisual() {
-  const items = [
-    "Search like you think",
-    "vaultix search",
-    "smart filter",
-    "VaultIX",
-    "priority",
-    "Git-SK",
-    "categories",
-    "quick find"
-  ];
-
-  return (
-    <div className="relative w-full h-full flex items-center justify-center p-6 overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-full bg-purple-500/5 blur-[120px]" />
-
-      <div className="relative z-10 w-full max-w-[380px] grid grid-cols-2 gap-3.5">
-        {items.map((text, i) => (
-          <motion.div
-            key={i}
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05, duration: 0.5 }}
-            className="flex items-center gap-2 px-4 py-3 rounded-full bg-white/[0.03] border border-white/10 backdrop-blur-md group hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300"
-          >
-            <Search className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
-            <span className="text-[11px] font-medium text-white/50 group-hover:text-white/80 transition-colors truncate">
-              {text}
-            </span>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Cinematic Scanning Line */}
-      <motion.div
-        animate={{ top: ["0%", "100%", "0%"] }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-purple-500 to-transparent shadow-[0_0_15px_rgba(168,85,247,0.5)] z-20 pointer-events-none"
-      />
-    </div>
-  );
-}
-
-function FileCascade() {
-  // Deprecated
-  return null;
 }
 
 function FilterSortVisualizer() {
@@ -1063,6 +771,7 @@ function FilterSortVisualizer() {
                   <Box className="w-4 h-4 text-indigo-400" />
                 </div>
               ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- favicons and thumbnails come from arbitrary external hosts that next/image cannot allow-list
                 <img src={b.favicon} alt="favicon" className="w-[18px] h-[18px] object-contain" />
               )}
             </div>
@@ -1129,7 +838,7 @@ function PrivacyLock() {
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
           className="w-28 h-28 rounded-[3rem] bg-purple-500/10 border border-purple-500/20 flex items-center justify-center shadow-2xl shadow-purple-500/50 backdrop-blur-md"
         >
-          <ShieldCheck className="w-14 h-14 text-purple-400 shadow-pulse" />
+          <ShieldCheck className="w-14 h-14 text-purple-400" />
         </motion.div>
         <div className="absolute -inset-12 bg-purple-500/5 rounded-full blur-[80px] -z-10" />
       </div>
@@ -1140,7 +849,7 @@ function PrivacyLock() {
             <motion.div
               animate={{ x: [0, 24, 24, 0] }}
               transition={{ duration: 4, repeat: Infinity, times: [0, 0.4, 0.6, 1] }}
-              className="absolute left-1.5 top-1.5 w-3 h-3 rounded-full bg-white shadow-glow"
+              className="absolute left-1.5 top-1.5 w-3 h-3 rounded-full bg-white"
             />
           </div>
         </div>

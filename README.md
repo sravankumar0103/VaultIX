@@ -30,7 +30,7 @@ VaultIX is a high-fidelity bookmark and knowledge management platform designed f
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Charts**: [Recharts](https://recharts.org/)
 - **Email**: [Nodemailer](https://nodemailer.com/) + Gmail SMTP
-- **Exports**: [jsPDF](https://github.com/parallax/jsPDF) & [html2canvas](https://html2canvas.hertzen.com/)
+- **Exports**: [jsPDF](https://github.com/parallax/jsPDF) & [html-to-image](https://github.com/bubkoo/html-to-image)
 
 ---
 
@@ -43,7 +43,7 @@ VaultIX/
 ├── lib/                  # Core logic (Auth, Email, Theme, Supabase Client)
 ├── public/               # Static assets (Hero video, Brand icons)
 ├── types/                # TypeScript interfaces & definitions
-└── supabase/             # Database schema & migrations
+└── supabase/             # README (setup, apply order, Auth URLs) & hand-applied SQL migrations
 ```
 
 ### Key Logic Modules
@@ -81,10 +81,22 @@ VaultIX/
    ```
    *Open `.env.local` and fill in your Supabase and Gmail credentials. Note: This file is ignored by Git to keep your keys private.*
 
+   Variables (names only, see `.env.example`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GMAIL_USER`, `GMAIL_PASS`, `FEEDBACK_TO_EMAIL` (inbox that receives feedback reports), `ACCOUNT_DELETE_WEBHOOK_SECRET`.
+
+   Database setup and the order to apply the SQL files are in [`supabase/README.md`](supabase/README.md).
+
 4. **Start the development server**
    ```bash
    npm run dev
    ```
+
+### Checks
+
+```bash
+npm test          # Vitest unit tests
+npm run typecheck # tsc --noEmit
+npm run lint
+```
 
 ---
 

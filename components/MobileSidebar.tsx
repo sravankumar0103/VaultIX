@@ -2,20 +2,15 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { signOutGracefully } from "@/lib/authSession"
-import { clearSessionThemeOverride } from "@/lib/themePreferences"
+import { NAV_ITEMS, isActivePath } from "@/lib/navItems"
+import { useLogout } from "@/lib/useLogout"
+import { useDialog } from "@/lib/useDialog"
 import {
-  LayoutDashboard,
-  Star,
-  Folder,
-  Archive,
-  BarChart3,
   User,
   LogOut,
   X,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { useState } from "react"
 import LoadingLogo from "@/components/LoadingLogo"
 
 export default function MobileSidebar({
@@ -26,24 +21,8 @@ export default function MobileSidebar({
   onClose: () => void
 }) {
   const pathname = usePathname()
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
-
-  const navItems = [
-    { name: "All Bookmarks", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Priority", href: "/dashboard/priority", icon: Star },
-    { name: "Categories", href: "/dashboard/categories", icon: Folder },
-    { name: "Archived", href: "/dashboard/archived", icon: Archive },
-    { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  ]
-
-  const handleLogout = async () => {
-    if (isLoggingOut) return
-
-    setIsLoggingOut(true)
-    await signOutGracefully()
-    clearSessionThemeOverride()
-    window.location.href = "/"
-  }
+  const { logout, isLoggingOut } = useLogout()
+  const { dialogRef } = useDialog(isOpen, onClose)
 
   return (
     <>
@@ -62,6 +41,10 @@ export default function MobileSidebar({
 
           {/* Sidebar Drawer */}
           <motion.aside
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
@@ -75,6 +58,7 @@ export default function MobileSidebar({
               </h1>
               <button
                 onClick={onClose}
+                aria-label="Close menu"
                 className="p-2 rounded-xl bg-white/5 border border-white/5 text-themeMuted hover:text-themeText transition-all"
               >
                 <X size={20} />
@@ -83,16 +67,15 @@ export default function MobileSidebar({
 
             {/* Navigation */}
             <nav className="flex-1 flex flex-col gap-2">
-              {navItems.map((item) => {
-                const isActive = item.href === "/dashboard"
-                  ? pathname === "/dashboard"
-                  : pathname === item.href || pathname.startsWith(item.href + "/")
+              {NAV_ITEMS.map((item) => {
+                const isActive = isActivePath(pathname, item.href)
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     onClick={onClose}
+                    aria-current={isActive ? "page" : undefined}
                     className={`
                       flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300
                       ${isActive
@@ -120,7 +103,7 @@ export default function MobileSidebar({
               </Link>
 
               <button
-                onClick={handleLogout}
+                onClick={logout}
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-red-500 hover:bg-red-500/10 transition-all font-medium"
               >
                 <LogOut size={20} />
