@@ -10,13 +10,13 @@ contains a secret or a real address, and none is run by the app.
 |---|---|---|---|
 | (history) | `20260101_baseline_live_schema.sql` | Documents the live schema as known on 26 Nov 2026. **Do not run it on production.** | none |
 | (history) | `20260401_send_deleted_account_email.sql` | Legacy file, now reduced to `create extension if not exists pg_net` (its function body, secret and host were removed). C3 replaces the function and trigger. | none |
-| C1 | `20261125_01_bookmarks_rls.sql` | Enables RLS on `bookmarks` and creates the four `bookmarks_*_own` policies (`(select auth.uid()) = user_id`) when they do not exist. Drops nothing. | none: apply **first**. Its final NOTICE lists any OTHER policies on `bookmarks`: a loose permissive policy still grants access and must be reviewed against the Gate A export and dropped by hand. Rows with a NULL `user_id` become visible only to the service role: run `select count(*) from public.bookmarks where user_id is null` first. Realtime DELETE events are not RLS-checked and carry only the primary key. |
-| C2 | `20261125_02_user_foreign_keys.sql` | `complaints.user_id` becomes `ON DELETE CASCADE`; `bookmarks.user_id` gets an FK to `auth.users` with cascade, default `auth.uid()` and `NOT NULL` (validated only when no row breaks it). | C1 |
+| C2 | `20261125_02_user_foreign_keys.sql` | `complaints.user_id` becomes `ON DELETE CASCADE`; `bookmarks.user_id` gets an FK to `auth.users` with cascade, default `auth.uid()` and `NOT NULL` (validated only when no row breaks it). | none: safe to apply now |
 | C3 | `20261125_03_account_deleted_webhook_vault.sql` | Replaces `notify_vaultix_account_deleted()` and the trigger on `auth.users`: URL and secret are read from Vault, the trigger is `BEFORE DELETE`, and a failure never blocks a user deletion. | C2, **and** the two Vault secrets below must exist |
 | C4 | `20261125_04_bookmarks_complaints_hardening.sql` | `bookmarks.created_at` default and `NOT NULL`, CHECK constraints, indexes, `update_updated_at` search path, complaints grants. | Apply **only after the branch is deployed** (the old client inserted into `complaints` directly and that insert is refused afterwards) |
 
 Notes on the order:
 
+- File `20261125_01` was dropped on 26 Nov 2026: the live `bookmarks` RLS is already owner-scoped, so that migration was redundant. The numbers `_02`, `_03` and `_04` are kept as they are.
 - Apply C3 right after C2. Between C2 and C3 do not delete users from the Supabase dashboard: after C2 the cascade removes the bookmark rows before the old trigger could read their media paths.
 - Never apply C3 before the Vault secrets exist. Without them the trigger only logs a warning and
   no deletion mail is sent.
@@ -81,6 +81,4 @@ No code change is needed. Do all of these:
 - The media bucket is `media`; media paths are flat object names.
 - PostgREST max-rows (Project Settings, API): unknown until Gate A (the owner's schema export and
   dashboard value). Bookmark lists are read in full, so a low value would truncate them.
-- Still unknown until the Gate A export (`docs/superpowers/audit/schema-export.sql`): the policies
-  that existed on `bookmarks` before C1, storage policies, indexes before C4, and whether the
-  admin-deletion trigger ever existed on the live project.
+- `bookmarks` has four owner-scoped RLS policies (`user_id = auth.uid()`, all four commands), so no migration is needed for them. Gate A export of 26 Nov 2026: `docs/superpowers/audit/DECISIONS.md`.

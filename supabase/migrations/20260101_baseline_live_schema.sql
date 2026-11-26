@@ -8,8 +8,9 @@
 -- listed there is marked "UNKNOWN until the Gate A export" and is never guessed.
 --
 -- Written with "create ... if not exists" and guarded blocks, so running it on the live
--- project would change nothing. The files 20261125_01..04 change the schema afterwards;
--- they are mentioned in comments only.
+-- project would change nothing. The files 20261125_02..04 change the schema afterwards;
+-- they are mentioned in comments only. (20261125_01 was dropped on 26 Nov 2026: the live
+-- bookmarks RLS is already owner-scoped.)
 
 create extension if not exists pgcrypto;
 create extension if not exists "uuid-ossp";
@@ -48,7 +49,7 @@ create table if not exists public.complaints (
 -- Row Level Security.
 alter table public.complaints enable row level security;
 -- bookmarks RLS state and policies: UNKNOWN until the Gate A export
--- (docs/superpowers/audit/schema-export.sql). See 20261125_01_bookmarks_rls.sql.
+-- (docs/superpowers/audit/schema-export.sql).
 
 -- complaints has ONE policy: INSERT, with check (auth.uid() = user_id). Its NAME is UNKNOWN
 -- until the Gate A export, so nothing is created here. No SELECT, UPDATE or DELETE
